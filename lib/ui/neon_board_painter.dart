@@ -5,11 +5,15 @@ class NeonBoardPainter extends CustomPainter {
   final List<Offset> piecePositions;
   final List<Color> pieceColors;
   final Offset? selectedPosition;
+  final double boardPadding;
+  final double pieceRadius; // Nouveau paramètre pour le rayon dynamique
   
   NeonBoardPainter({
     required this.piecePositions,
     required this.pieceColors,
     this.selectedPosition,
+    this.boardPadding = 20.0,
+    this.pieceRadius = GameConstants.pieceRadius, // Valeur par défaut
   });
   
   @override
@@ -24,24 +28,40 @@ class NeonBoardPainter extends CustomPainter {
       ..strokeWidth = GameConstants.gridLineWidth
       ..style = PaintingStyle.stroke;
     
-    final cellWidth = size.width / 2;
-    final cellHeight = size.height / 2;
+    final cellWidth = (size.width - 2 * boardPadding) / 2;
+    final cellHeight = (size.height - 2 * boardPadding) / 2;
     
     // Lignes horizontales
     for (int i = 0; i <= 2; i++) {
-      final y = i * cellHeight;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      final y = boardPadding + i * cellHeight;
+      canvas.drawLine(
+        Offset(boardPadding, y),
+        Offset(size.width - boardPadding, y),
+        gridPaint,
+      );
     }
     
     // Lignes verticales
     for (int i = 0; i <= 2; i++) {
-      final x = i * cellWidth;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      final x = boardPadding + i * cellWidth;
+      canvas.drawLine(
+        Offset(x, boardPadding),
+        Offset(x, size.height - boardPadding),
+        gridPaint,
+      );
     }
     
     // Diagonales
-    canvas.drawLine(Offset(0, 0), Offset(size.width, size.height), gridPaint);
-    canvas.drawLine(Offset(size.width, 0), Offset(0, size.height), gridPaint);
+    canvas.drawLine(
+      Offset(boardPadding, boardPadding),
+      Offset(size.width - boardPadding, size.height - boardPadding),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width - boardPadding, boardPadding),
+      Offset(boardPadding, size.height - boardPadding),
+      gridPaint,
+    );
     
     // Points d'intersection avec effet glow
     final pointPaint = Paint()
@@ -50,7 +70,10 @@ class NeonBoardPainter extends CustomPainter {
     
     for (int x = 0; x <= 2; x++) {
       for (int y = 0; y <= 2; y++) {
-        final pos = Offset(x * cellWidth, y * cellHeight);
+        final pos = Offset(
+          boardPadding + x * cellWidth,
+          boardPadding + y * cellHeight,
+        );
         
         // Effet de glow
         final glowPaint = Paint()
@@ -75,7 +98,8 @@ class NeonBoardPainter extends CustomPainter {
   }
   
   void _drawPieceWithGlow(Canvas canvas, Offset position, Color color, {bool isSelected = false}) {
-    final radius = GameConstants.pieceRadius;
+    // Utiliser le rayon passé en paramètre
+    final radius = pieceRadius;
     
     // Effet de lueur (plusieurs cercles superposés)
     final glowColors = [
@@ -130,6 +154,8 @@ class NeonBoardPainter extends CustomPainter {
   bool shouldRepaint(covariant NeonBoardPainter oldDelegate) {
     return oldDelegate.piecePositions != piecePositions ||
            oldDelegate.pieceColors != pieceColors ||
-           oldDelegate.selectedPosition != selectedPosition;
+           oldDelegate.selectedPosition != selectedPosition ||
+           oldDelegate.boardPadding != boardPadding ||
+           oldDelegate.pieceRadius != pieceRadius;
   }
 }

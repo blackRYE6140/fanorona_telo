@@ -24,6 +24,30 @@ class _GameBoardState extends State<GameBoard> {
   // ignore: unused_field
   Size _boardSize = Size.zero;
   
+  // Méthode pour obtenir le padding dynamique
+  double get _dynamicPadding {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 350) {
+      return 15.0; // Petit écran
+    } else if (screenWidth < 400) {
+      return 20.0; // Écran moyen
+    } else {
+      return 25.0; // Grand écran
+    }
+  }
+  
+  // Méthode pour obtenir le rayon des pièces dynamique
+  double get _dynamicPieceRadius {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 350) {
+      return 14.0; // Plus petit sur petits écrans
+    } else if (screenWidth < 400) {
+      return 16.0; // Écran moyen
+    } else {
+      return 18.0; // Grand écran
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -46,6 +70,11 @@ class _GameBoardState extends State<GameBoard> {
                 painter: _buildBoardPainter(boardSize),
               ),
               
+              // Indicateurs de mouvement possibles (si une pièce est sélectionnée)
+              if (widget.gameState.isMovementPhase && 
+                  widget.gameState.selectedPiece != null)
+                ..._buildPossibleMoves(boardSize),
+              
               // Pièces
               ..._buildPieces(boardSize),
               
@@ -66,7 +95,7 @@ class _GameBoardState extends State<GameBoard> {
   
   NeonBoardPainter _buildBoardPainter(Size boardSize) {
     final piecePositions = widget.gameState.pieces.map((piece) {
-      return PositionUtils.gridToScreen(piece.position, boardSize);
+      return PositionUtils.gridToScreen(piece.position, boardSize, padding: _dynamicPadding);
     }).toList();
     
     final pieceColors = widget.gameState.pieces.map((piece) {
@@ -79,6 +108,7 @@ class _GameBoardState extends State<GameBoard> {
         ? PositionUtils.gridToScreen(
             widget.gameState.selectedPiece!.position,
             boardSize,
+            padding: _dynamicPadding,
           )
         : null;
     
@@ -86,22 +116,69 @@ class _GameBoardState extends State<GameBoard> {
       piecePositions: piecePositions,
       pieceColors: pieceColors,
       selectedPosition: selectedPosition,
+      boardPadding: _dynamicPadding,
+      pieceRadius: _dynamicPieceRadius, // Rayon dynamique passé ici
     );
+  }
+  
+  List<Widget> _buildPossibleMoves(Size boardSize) {
+    List<Widget> indicators = [];
+    
+    if (widget.gameState.selectedPiece != null) {
+      final adjacentPositions = PositionUtils.getAdjacentPositions(
+        widget.gameState.selectedPiece!.position,
+      );
+      
+      for (var gridPos in adjacentPositions) {
+        // Vérifie si la position est libre
+        if (!widget.gameState.isPositionOccupied(gridPos)) {
+          final screenPos = PositionUtils.gridToScreen(gridPos, boardSize, padding: _dynamicPadding);
+          
+          indicators.add(
+            Positioned(
+              left: screenPos.dx - 15,
+              top: screenPos.dy - 15,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: GameConstants.withAlpha(Colors.green, 50),
+                  border: Border.all(
+                    color: Colors.green,
+                    width: 1,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.arrow_forward,
+                    size: 16,
+                    color: Colors.green,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+      }
+    }
+    
+    return indicators;
   }
   
   List<Widget> _buildPieces(Size boardSize) {
     _boardSize = boardSize;
     
     return widget.gameState.pieces.map((piece) {
-      final screenPos = PositionUtils.gridToScreen(piece.position, boardSize);
+      final screenPos = PositionUtils.gridToScreen(piece.position, boardSize, padding: _dynamicPadding);
       final isSelected = widget.gameState.selectedPiece == piece;
       final isDraggable = widget.gameState.isMovementPhase &&
           piece.player == widget.gameState.currentPlayer &&
           widget.gameState.status == GameStatus.playing;
       
       return Positioned(
-        left: screenPos.dx - GameConstants.pieceRadius,
-        top: screenPos.dy - GameConstants.pieceRadius,
+        left: screenPos.dx - _dynamicPieceRadius, // Utiliser rayon dynamique
+        top: screenPos.dy - _dynamicPieceRadius,  // Utiliser rayon dynamique
         child: PieceWidget(
           piece: piece,
           isSelected: isSelected,
@@ -125,7 +202,7 @@ class _GameBoardState extends State<GameBoard> {
       for (var gridPos in adjacentPositions) {
         // Vérifie si la position est libre
         if (!widget.gameState.isPositionOccupied(gridPos)) {
-          final screenPos = PositionUtils.gridToScreen(gridPos, boardSize);
+          final screenPos = PositionUtils.gridToScreen(gridPos, boardSize, padding: _dynamicPadding);
           
           targets.add(
             Positioned(
@@ -163,7 +240,7 @@ class _GameBoardState extends State<GameBoard> {
     return GestureDetector(
       onTapDown: (details) {
         final localPos = details.localPosition;
-        final gridPos = PositionUtils.screenToGrid(localPos, boardSize);
+        final gridPos = PositionUtils.screenToGrid(localPos, boardSize, padding: _dynamicPadding);
         
         if (gridPos != null) {
           _onBoardTapped(gridPos);

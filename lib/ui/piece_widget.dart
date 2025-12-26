@@ -6,6 +6,7 @@ class PieceWidget extends StatelessWidget {
   final GamePiece piece;
   final bool isSelected;
   final bool isDraggable;
+  final double radius; // Nouveau paramètre pour le rayon
   final VoidCallback? onTap;
   final VoidCallback? onDragStarted;
   
@@ -14,6 +15,7 @@ class PieceWidget extends StatelessWidget {
     required this.piece,
     this.isSelected = false,
     this.isDraggable = false,
+    this.radius = GameConstants.pieceRadius, // Valeur par défaut
     this.onTap,
     this.onDragStarted,
   });
@@ -27,8 +29,8 @@ class PieceWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final widget = Container(
-      width: GameConstants.pieceRadius * 2,
-      height: GameConstants.pieceRadius * 2,
+      width: radius * 2, // Utiliser le rayon passé
+      height: radius * 2, // Utiliser le rayon passé
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: GameConstants.withAlpha(pieceColor, 76), // 0.3 * 255
@@ -51,8 +53,8 @@ class PieceWidget extends StatelessWidget {
       ),
       child: Center(
         child: Container(
-          width: GameConstants.pieceRadius,
-          height: GameConstants.pieceRadius,
+          width: radius, // Utiliser le rayon passé
+          height: radius, // Utiliser le rayon passé
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(

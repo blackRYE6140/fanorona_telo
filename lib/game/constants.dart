@@ -36,7 +36,7 @@ class GameConstants {
   // Tailles
   static const double boardPadding = 40.0;
   static const double gridLineWidth = 1.5;
-  static const double pieceRadius = 20.0;
+  static const double pieceRadius = 18.0;
   
   // Nombre de pièces
   static const int piecesPerPlayer = 3;

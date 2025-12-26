@@ -34,20 +34,18 @@ class _GamePageState extends State<GamePage> {
   
   String get _gameStatusText {
     if (_gameState.status == GameStatus.player1Won) {
-      return GameConstants.player1Wins;
+      return "🎉 Rouge Gagne !";
     } else if (_gameState.status == GameStatus.player2Won) {
-      return GameConstants.player2Wins;
+      return "🎉 Bleu Gagne !";
     } else {
       return _gameState.currentPlayer == Player.player1
-          ? GameConstants.player1Turn
-          : GameConstants.player2Turn;
+          ? "Tour: Rouge"
+          : "Tour: Bleu";
     }
   }
   
   String get _gamePhaseText {
-    return _gameState.isPlacementPhase
-        ? GameConstants.placementPhase
-        : GameConstants.movementPhase;
+    return _gameState.isPlacementPhase ? "Placement" : "Mouvement";
   }
   
   Color get _currentPlayerColor {
@@ -58,39 +56,57 @@ class _GamePageState extends State<GamePage> {
   
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isVerySmallScreen = screenHeight < 500 || screenWidth < 350;
+    // ignore: unused_local_variable
+    final isSmallScreen = screenHeight < 600;
+    
     return Scaffold(
       backgroundColor: GameConstants.backgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.symmetric(
+            horizontal: isVerySmallScreen ? 8.0 : 12.0,
+            vertical: isVerySmallScreen ? 4.0 : 8.0,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // En-tête
-              _buildHeader(),
+              // En-tête TRÈS compact
+              _buildHeader(isVerySmallScreen),
               
-              const SizedBox(height: 20),
+              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
               
-              // Plateau de jeu
+              // Plateau de jeu - prend plus d'espace
               Expanded(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: GameBoard(
-                    gameState: _gameState,
-                    onStateChanged: _handleStateChanged,
-                  ),
+                flex: isVerySmallScreen ? 7 : 5,
+                child: GameBoard(
+                  gameState: _gameState,
+                  onStateChanged: _handleStateChanged,
                 ),
               ),
               
-              const SizedBox(height: 20),
+              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
               
-              // Infos et statistiques
-              _buildGameInfo(),
+              // Infos ULTRA compactes
+              Container(
+                padding: EdgeInsets.all(isVerySmallScreen ? 6.0 : 10.0),
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(76),
+                  borderRadius: BorderRadius.circular(isVerySmallScreen ? 6.0 : 10.0),
+                  border: Border.all(
+                    color: GameConstants.gridColor.withAlpha(76),
+                    width: 1,
+                  ),
+                ),
+                child: _buildUltraCompactGameInfo(isVerySmallScreen),
+              ),
               
-              const SizedBox(height: 20),
+              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
               
-              // Bouton reset
-              _buildResetButton(),
+              // Bouton reset compact
+              _buildResetButton(isVerySmallScreen),
             ],
           ),
         ),
@@ -98,30 +114,24 @@ class _GamePageState extends State<GamePage> {
     );
   }
   
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isVerySmallScreen) {
     return Column(
       children: [
         Text(
           'FANORONA TELO',
           style: TextStyle(
-            fontSize: 32,
+            fontSize: isVerySmallScreen ? 18.0 : 24.0,
             fontWeight: FontWeight.bold,
             color: GameConstants.gridColor,
-            letterSpacing: 2,
-            shadows: [
-              Shadow(
-                color: GameConstants.gridColor.withOpacity(0.5),
-                blurRadius: 10,
-              ),
-            ],
+            letterSpacing: 1.0,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 2),
         Text(
-          'Jeu Traditionnel Malgache',
+          'Jeu Magasy Traditionnel by blackRYE',
           style: TextStyle(
-            fontSize: 14,
-            color: Colors.white.withOpacity(0.7),
+            fontSize: isVerySmallScreen ? 9.0 : 11.0,
+            color: Colors.white.withAlpha(153),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -129,205 +139,172 @@ class _GamePageState extends State<GamePage> {
     );
   }
   
-  Widget _buildGameInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: GameConstants.gridColor.withOpacity(0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          // Phase et tour
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Phase:',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                  Text(
-                    _gamePhaseText,
-                    style: TextStyle(
-                      color: _currentPlayerColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Tour:',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                  Text(
-                    '${_gameState.turnsPlayed + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Statut du jeu
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _currentPlayerColor.withOpacity(0.5),
-              ),
-            ),
-            child: Row(
+  Widget _buildUltraCompactGameInfo(bool isVerySmallScreen) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Colonne gauche: Phase et Tour
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _currentPlayerColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _currentPlayerColor.withOpacity(0.5),
-                        blurRadius: 8,
-                      ),
-                    ],
+                Text(
+                  'Phase: ',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(153),
+                    fontSize: isVerySmallScreen ? 10.0 : 12.0,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _gameStatusText,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  _gamePhaseText,
+                  style: TextStyle(
+                    color: _currentPlayerColor,
+                    fontSize: isVerySmallScreen ? 10.0 : 12.0,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Compteurs de pièces
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildPieceCounter(
-                'Joueur Rouge',
-                GameConstants.neonPink,
-                _gameState.player1Pieces.length,
-                GameConstants.piecesPerPlayer,
-              ),
-              _buildPieceCounter(
-                'Joueur Bleu',
-                GameConstants.neonBlue,
-                _gameState.player2Pieces.length,
-                GameConstants.piecesPerPlayer,
-              ),
-            ],
-          ),
-          
-          // Instructions
-          if (_gameState.status == GameStatus.playing)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                _gameState.isPlacementPhase
-                    ? 'Cliquez sur une intersection vide pour placer votre pion'
-                    : 'Glissez-déposez vos pions vers les positions adjacentes libres',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
+            SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  'Tour: ',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(153),
+                    fontSize: isVerySmallScreen ? 10.0 : 12.0,
+                  ),
                 ),
-                textAlign: TextAlign.center,
+                Text(
+                  '${_gameState.turnsPlayed + 1}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isVerySmallScreen ? 14.0 : 18.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        
+        // Colonne centre: Statut
+        Expanded(
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: isVerySmallScreen ? 6.0 : 10.0),
+            padding: EdgeInsets.symmetric(
+              horizontal: isVerySmallScreen ? 6.0 : 10.0,
+              vertical: isVerySmallScreen ? 4.0 : 6.0,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(102),
+              borderRadius: BorderRadius.circular(isVerySmallScreen ? 4.0 : 6.0),
+              border: Border.all(
+                color: _currentPlayerColor.withAlpha(102),
               ),
             ),
-        ],
-      ),
+            child: Center(
+              child: Text(
+                _gameStatusText,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isVerySmallScreen ? 10.0 : 12.0,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+        
+        // Colonne droite: Compteurs
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildMiniPieceCounter(
+              isVerySmallScreen,
+              GameConstants.neonPink,
+              _gameState.player1Pieces.length,
+            ),
+            SizedBox(height: 4),
+            _buildMiniPieceCounter(
+              isVerySmallScreen,
+              GameConstants.neonBlue,
+              _gameState.player2Pieces.length,
+            ),
+          ],
+        ),
+      ],
     );
   }
   
-  Widget _buildPieceCounter(String label, Color color, int placed, int total) {
-    return Column(
+  Widget _buildMiniPieceCounter(bool isVerySmallScreen, Color color, int placed) {
+    return Row(
       children: [
         Container(
-          width: 30,
-          height: 30,
+          width: isVerySmallScreen ? 14.0 : 18.0,
+          height: isVerySmallScreen ? 14.0 : 18.0,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withOpacity(0.2),
-            border: Border.all(color: color),
+            color: color.withAlpha(76),
+            border: Border.all(color: color, width: 1),
           ),
           child: Center(
             child: Text(
-              '$placed/$total',
+              '$placed',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: isVerySmallScreen ? 8.0 : 10.0,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(width: 4),
         Text(
-          label,
+          '/${GameConstants.piecesPerPlayer}',
           style: TextStyle(
-            color: color,
-            fontSize: 10,
+            color: Colors.white.withAlpha(153),
+            fontSize: isVerySmallScreen ? 8.0 : 10.0,
           ),
         ),
       ],
     );
   }
   
-  Widget _buildResetButton() {
+  Widget _buildResetButton(bool isVerySmallScreen) {
     return ElevatedButton(
       onPressed: _resetGame,
       style: ElevatedButton.styleFrom(
-        backgroundColor: GameConstants.gridColor.withOpacity(0.2),
+        backgroundColor: GameConstants.gridColor.withAlpha(51),
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: EdgeInsets.symmetric(
+          vertical: isVerySmallScreen ? 8.0 : 12.0,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(isVerySmallScreen ? 6.0 : 8.0),
           side: BorderSide(color: GameConstants.gridColor),
         ),
+        minimumSize: Size.zero, // Important pour les petits écrans
       ),
-      child: const Row(
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min, // Important pour éviter l'overflow
         children: [
-          Icon(Icons.refresh, size: 20),
-          SizedBox(width: 8),
+          Icon(
+            Icons.refresh,
+            size: isVerySmallScreen ? 14.0 : 18.0,
+          ),
+          SizedBox(width: isVerySmallScreen ? 4.0 : 6.0),
           Text(
             'Nouvelle Partie',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: isVerySmallScreen ? 11.0 : 14.0,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
