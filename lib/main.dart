@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'ui/game_page.dart';
+import 'ui/home_page.dart';
 
 void main() {
   runApp(const FanoronaTeloApp());
@@ -19,7 +19,7 @@ class FanoronaTeloApp extends StatelessWidget {
           secondary: const Color(0xFFFF1493),
         ),
       ),
-      home: const GamePage(),
+      home: const HomePage(),
       debugShowCheckedModeBanner: false,
     );
   }

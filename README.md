@@ -112,3 +112,12 @@ for i, positions in enumerate(steps):
 
 plt.tight_layout()
 plt.show()
+
+
+
+#build apk
+flutter build apk --split-per-abi 
+
+#build web
+flutter build web --release
+npx serve build/web
