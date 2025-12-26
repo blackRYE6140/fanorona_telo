@@ -29,6 +29,8 @@ enum AIDifficulty { strategist, master }
 
 // Constantes de jeu
 class GameConstants {
+
+  
   // Couleurs style néon
   static const Color backgroundColor = Color(0xFF020014);
   static const Color gridColor = Color(0xFF0066FF);
@@ -68,6 +70,9 @@ class GameConstants {
   static const int strategistDepth = 3;
   static const int masterDepth = 5;
   static const int aiThinkingDelay = 800; // ms
+  
+  // Dans la classe GameConstants, ajouter :
+  static const Color masterAIColor = Color(0xFFFF0000); // Rouge pour danger
   
   // Méthode pour éviter la dépréciation withOpacity
   static Color withAlpha(Color color, int alpha) {
