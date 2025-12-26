@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="fanorona_telo"
+        android:label="FanoronaTelo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

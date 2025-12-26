@@ -128,7 +128,7 @@ class _GamePageState extends State<GamePage> {
         ),
         SizedBox(height: 2),
         Text(
-          'Jeu Magasy Traditionnel by blackRYE',
+          'Jeu Malagasy Traditionnel by blackRYE',
           style: TextStyle(
             fontSize: isVerySmallScreen ? 9.0 : 11.0,
             color: Colors.white.withAlpha(153),
