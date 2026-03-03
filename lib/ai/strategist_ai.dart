@@ -1,101 +1,265 @@
-import 'dart:async';
 import 'dart:math';
-import 'fanorona_ai.dart';
-import '../game/game_state.dart';
+
 import '../game/ai_game_logic.dart';
 import '../game/constants.dart';
+import '../game/game_logic.dart';
+import '../game/game_state.dart';
+import 'fanorona_ai.dart';
+import 'pattern_recognizer.dart';
 
 class StrategistAI extends FanoronaAI {
   StrategistAI()
-      : super(
-          name: 'Stratège',
-          description: 'Défi équilibré - Analyse 3 coups',
-          strength: 3,
-          color: GameConstants.strategistColor,
-        );
-  
+    : super(
+        name: 'Stratège',
+        description: 'Défi équilibré - Analyse 3 coups',
+        strength: 3,
+        color: GameConstants.strategistColor,
+      );
+
   final Random _random = Random();
-  
+
   @override
   Future<GridPosition?> getPlacementMove(GameState state) async {
     await think();
-    
+
     final emptyPositions = _getEmptyPositions(state);
     if (emptyPositions.isEmpty) return null;
-    
-    // Stratégie de placement intelligente
-    // 1. Essayer de prendre le centre
-    final center = GridPosition(1, 1);
-    if (emptyPositions.contains(center)) {
-      return center;
+
+    final immediateWin = _findImmediateWinningPlacement(state, Player.player2);
+    if (immediateWin != null) {
+      return immediateWin;
     }
-    
-    // 2. Prendre un coin adjacent au centre
-    final corners = [
-      GridPosition(0, 0), GridPosition(2, 0),
-      GridPosition(0, 2), GridPosition(2, 2),
-    ];
-    
-    for (var corner in corners) {
-      if (emptyPositions.contains(corner)) {
-        // Vérifier si le centre est occupé par l'adversaire
-        final centerPiece = state.getPieceAt(center);
-        if (centerPiece != null && centerPiece.player != Player.player2) {
-          return corner; // Bon pour attaquer le centre
-        }
-      }
+
+    final immediateBlock = _findImmediateWinningPlacement(
+      state,
+      Player.player1,
+    );
+    if (immediateBlock != null) {
+      return immediateBlock;
     }
-    
-    // 3. Choisir aléatoirement parmi les meilleures positions
-    final goodPositions = emptyPositions.where((pos) {
-      // Éviter les bords non stratégiques si possible
-      return !(pos.x == 1 && (pos.y == 0 || pos.y == 2)) &&
-             !(pos.y == 1 && (pos.x == 0 || pos.x == 2));
-    }).toList();
-    
-    if (goodPositions.isNotEmpty) {
-      return goodPositions[_random.nextInt(goodPositions.length)];
-    }
-    
-    // 4. Fallback: position aléatoire
-    return emptyPositions[_random.nextInt(emptyPositions.length)];
+
+    final scoredPlacements = emptyPositions.map((position) {
+      final nextState = GameLogic.placePiece(state, position);
+      final score = _scorePlacementCandidate(position, nextState);
+      return MapEntry(position, score);
+    }).toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    final selectedIndex = _pickImperfectIndex(
+      scoredPlacements.length,
+      baseImprecision: 0.22,
+      maxOffset: 2,
+    );
+    return scoredPlacements[selectedIndex].key;
   }
-  
+
   @override
   Future<AIMove?> getMovementMove(GameState state) async {
     await think();
-    
-    // Utiliser Minimax avec profondeur limitée
+
+    // 1) Jouer la victoire immédiate.
+    final winningMoves = PatternRecognizer.findWinningMoves(
+      state,
+      Player.player2,
+    );
+    if (winningMoves.isNotEmpty) {
+      return _pickBestByEvaluation(state, winningMoves);
+    }
+
+    // 2) Bloquer les menaces adverses immédiates.
+    final defensiveMove = _findBestDefensiveMove(state);
+    if (defensiveMove != null) {
+      return defensiveMove;
+    }
+
+    // 3) Minimax alpha-bêta standard (moins fort que Maître).
     final bestMove = await AIGameLogic.findBestMove(
       state,
       Player.player2, // L'IA est toujours le joueur 2
       GameConstants.strategistDepth,
       true, // Utiliser élagage alpha-bêta
+      evaluator: AIGameLogic.evaluatePosition,
     );
-    
+
     if (bestMove != null) {
+      final imperfectAlternative = _chooseImperfectAlternative(state, bestMove);
+      if (imperfectAlternative != null) {
+        return imperfectAlternative;
+      }
+
       return bestMove;
     }
-    
-    // Fallback: mouvement aléatoire
-    final playerPieces = state.player2Pieces;
-    if (playerPieces.isEmpty) return null;
-    
-    final shuffledPieces = List<GamePiece>.from(playerPieces)..shuffle();
-    
-    for (var piece in shuffledPieces) {
-      final adjacent = _getAdjacentPositions(piece.position);
-      final validMoves = adjacent.where((pos) => !state.isPositionOccupied(pos)).toList();
-      
-      if (validMoves.isNotEmpty) {
-        validMoves.shuffle();
-        return AIMove(piece, validMoves.first);
+
+    // 4) Fallback: choisir parmi les meilleurs coups heuristiques.
+    final fallbackMoves = AIGameLogic.orderMoves(
+      AIGameLogic.getMovementMoves(state, Player.player2),
+      state,
+      Player.player2,
+      evaluator: AIGameLogic.evaluatePosition,
+      maximizing: true,
+    );
+
+    if (fallbackMoves.isEmpty) return null;
+    final pickCount = min(3, fallbackMoves.length);
+    return fallbackMoves[_random.nextInt(pickCount)];
+  }
+
+  GridPosition? _findImmediateWinningPlacement(GameState state, Player player) {
+    final emptyPositions = _getEmptyPositions(state);
+
+    for (final pos in emptyPositions) {
+      final simulated = GameState(
+        pieces: List<GamePiece>.from(state.pieces)
+          ..add(GamePiece(player: player, position: pos)),
+        currentPlayer: state.currentPlayer,
+        phase: state.phase,
+        status: state.status,
+        turnsPlayed: state.turnsPlayed,
+      );
+
+      if (GameLogic.checkWin(simulated, player)) {
+        return pos;
       }
     }
-    
+
     return null;
   }
-  
+
+  int _scorePlacementCandidate(GridPosition position, GameState state) {
+    int score = AIGameLogic.evaluatePosition(state, Player.player2);
+
+    if (position == const GridPosition(1, 1)) {
+      score += 200;
+    } else if ((position.x == 0 || position.x == 2) &&
+        (position.y == 0 || position.y == 2)) {
+      score += 90;
+    } else {
+      score += 60;
+    }
+
+    final aiWinningChances = PatternRecognizer.findWinningMoves(
+      state,
+      Player.player2,
+    ).length;
+    final opponentWinningChances = PatternRecognizer.findWinningMoves(
+      state,
+      Player.player1,
+    ).length;
+
+    score += aiWinningChances * 350;
+    score -= opponentWinningChances * 450;
+    return score;
+  }
+
+  AIMove? _findBestDefensiveMove(GameState state) {
+    final opponentThreats = PatternRecognizer.findWinningMoves(
+      state,
+      Player.player1,
+    );
+    if (opponentThreats.isEmpty) return null;
+
+    final moves = AIGameLogic.getMovementMoves(state, Player.player2);
+    if (moves.isEmpty) return null;
+
+    AIMove? bestBlockingMove;
+    int bestBlockingScore = -100000000;
+
+    AIMove? bestDamageControlMove;
+    int bestRemainingThreats = 100000000;
+    int bestDamageControlScore = -100000000;
+
+    for (final move in moves) {
+      final simulated = AIGameLogic.simulateMove(state, move);
+      final remainingThreats = PatternRecognizer.findWinningMoves(
+        simulated,
+        Player.player1,
+      ).length;
+      final eval = AIGameLogic.evaluatePosition(simulated, Player.player2);
+
+      if (remainingThreats == 0 && eval > bestBlockingScore) {
+        bestBlockingScore = eval;
+        bestBlockingMove = move;
+      }
+
+      if (remainingThreats < bestRemainingThreats ||
+          (remainingThreats == bestRemainingThreats &&
+              eval > bestDamageControlScore)) {
+        bestRemainingThreats = remainingThreats;
+        bestDamageControlScore = eval;
+        bestDamageControlMove = move;
+      }
+    }
+
+    return bestBlockingMove ?? bestDamageControlMove;
+  }
+
+  AIMove _pickBestByEvaluation(GameState state, List<AIMove> moves) {
+    AIMove bestMove = moves.first;
+    int bestScore = -100000000;
+
+    for (final move in moves) {
+      final simulated = AIGameLogic.simulateMove(state, move);
+      final score = AIGameLogic.evaluatePosition(simulated, Player.player2);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+    }
+    return bestMove;
+  }
+
+  AIMove? _chooseImperfectAlternative(GameState state, AIMove bestMove) {
+    if (_random.nextDouble() > 0.28) {
+      return null;
+    }
+
+    final orderedMoves = AIGameLogic.orderMoves(
+      AIGameLogic.getMovementMoves(state, Player.player2),
+      state,
+      Player.player2,
+      evaluator: AIGameLogic.evaluatePosition,
+      maximizing: true,
+    );
+
+    final alternatives = <AIMove>[];
+    for (final move in orderedMoves) {
+      if (_sameMove(move, bestMove)) continue;
+
+      final simulated = AIGameLogic.simulateMove(state, move);
+      final givesImmediateWin = PatternRecognizer.findWinningMoves(
+        simulated,
+        Player.player1,
+      ).isNotEmpty;
+      if (givesImmediateWin) continue;
+
+      alternatives.add(move);
+      if (alternatives.length >= 2) break;
+    }
+
+    if (alternatives.isEmpty) {
+      return null;
+    }
+
+    return alternatives[_random.nextInt(alternatives.length)];
+  }
+
+  bool _sameMove(AIMove a, AIMove b) {
+    return a.piece.position == b.piece.position &&
+        a.newPosition == b.newPosition;
+  }
+
+  int _pickImperfectIndex(
+    int length, {
+    required double baseImprecision,
+    required int maxOffset,
+  }) {
+    if (length <= 1 || _random.nextDouble() > baseImprecision) {
+      return 0;
+    }
+
+    final highestIndex = min(length - 1, maxOffset);
+    return 1 + _random.nextInt(highestIndex);
+  }
+
   List<GridPosition> _getEmptyPositions(GameState state) {
     final List<GridPosition> empty = [];
     for (int x = 0; x <= 2; x++) {
@@ -107,30 +271,5 @@ class StrategistAI extends FanoronaAI {
       }
     }
     return empty;
-  }
-  
-  List<GridPosition> _getAdjacentPositions(GridPosition position) {
-    // Implémentation simplifiée
-    final positions = <GridPosition>[];
-    
-    // Horizontal et vertical
-    for (int dx = -1; dx <= 1; dx++) {
-      for (int dy = -1; dy <= 1; dy++) {
-        if (dx == 0 && dy == 0) continue;
-        if (dx.abs() == 1 && dy.abs() == 1) {
-          // Diagonales seulement depuis centre ou coins
-          if (position.x == 1 || position.y == 1) continue;
-        }
-        
-        final newX = position.x + dx;
-        final newY = position.y + dy;
-        
-        if (newX >= 0 && newX <= 2 && newY >= 0 && newY <= 2) {
-          positions.add(GridPosition(newX, newY));
-        }
-      }
-    }
-    
-    return positions;
   }
 }
