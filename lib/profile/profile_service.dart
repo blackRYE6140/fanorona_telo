@@ -8,6 +8,7 @@ import 'player_profile.dart';
 class ProfileService {
   static const String _nameKey = 'profile_name';
   static const String _avatarPathKey = 'profile_avatar_path';
+  static const String _setupDoneKey = 'profile_setup_done';
 
   static Future<PlayerProfile> loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,6 +41,31 @@ class ProfileService {
     } else {
       await prefs.remove(_avatarPathKey);
     }
+
+    await prefs.setBool(_setupDoneKey, true);
+  }
+
+  static Future<bool> isProfileConfigured() async {
+    final prefs = await SharedPreferences.getInstance();
+    final explicitFlag = prefs.getBool(_setupDoneKey);
+    if (explicitFlag != null) {
+      return explicitFlag;
+    }
+
+    // Backward compatibility: infer setup for users who already had a profile
+    // before this flag existed.
+    final savedName = (prefs.getString(_nameKey) ?? '').trim();
+    final savedAvatarPath = (prefs.getString(_avatarPathKey) ?? '').trim();
+    final hasCustomName =
+        savedName.isNotEmpty && savedName != PlayerProfile.fallback.name;
+    final hasAvatar = savedAvatarPath.isNotEmpty;
+    return hasCustomName || hasAvatar;
+  }
+
+  static Future<bool> isNetworkProfileReady() async {
+    final profile = await loadProfile();
+    final avatarPath = profile.avatarPath;
+    return avatarPath != null && avatarPath.isNotEmpty;
   }
 
   static Future<String?> avatarPathToBase64(String? avatarPath) async {

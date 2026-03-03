@@ -1,12 +1,53 @@
 import 'package:flutter/material.dart';
 
 import '../game/constants.dart';
+import '../profile/profile_service.dart';
 import 'game_page.dart';
+import 'profile_page.dart';
 import 'network/internet_lobby_page.dart';
 import 'network/lan_lobby_page.dart';
 
 class TwoPlayersOptionsPage extends StatelessWidget {
   const TwoPlayersOptionsPage({super.key});
+
+  Future<void> _openNetworkLobbyWithProfileGate(
+    BuildContext context,
+    Widget lobbyPage,
+  ) async {
+    var isConfigured = await ProfileService.isNetworkProfileReady();
+    if (!context.mounted) {
+      return;
+    }
+
+    if (!isConfigured) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfilePage()),
+      );
+
+      if (!context.mounted) {
+        return;
+      }
+
+      isConfigured = await ProfileService.isNetworkProfileReady();
+      if (!context.mounted) {
+        return;
+      }
+
+      if (!isConfigured) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Veuillez ajouter une photo de profil pour jouer en réseau.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => lobbyPage));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,12 +114,10 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                         title: 'SOCKET RÉSEAU LOCAL',
                         subtitle: '2 téléphones sur le même Wi-Fi',
                         color: GameConstants.neonBlue,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await _openNetworkLobbyWithProfileGate(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const LanLobbyPage(),
-                            ),
+                            const LanLobbyPage(),
                           );
                         },
                       ),
@@ -89,12 +128,10 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                         title: 'CONNEXION INTERNET',
                         subtitle: '2 téléphones à distance',
                         color: GameConstants.neonPink,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await _openNetworkLobbyWithProfileGate(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const InternetLobbyPage(),
-                            ),
+                            const InternetLobbyPage(),
                           );
                         },
                       ),
