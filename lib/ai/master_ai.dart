@@ -79,10 +79,11 @@ class MasterAI extends FanoronaAI {
     }
 
     // 4) Minimax agressif profond + alpha-bêta + table de transposition.
+    final searchDepth = _getAdaptiveMasterDepth(state);
     final bestMove = await AIGameLogic.findBestMove(
       state,
       Player.player2,
-      GameConstants.masterDepth + 1,
+      searchDepth,
       true,
       evaluator: AIGameLogic.evaluateAggressivePosition,
     );
@@ -117,28 +118,12 @@ class MasterAI extends FanoronaAI {
       return immediateBlock;
     }
 
-    if (state.turnsPlayed <= 2) {
-      final opening = OpeningBook.getBestOpeningMove(state);
-      if (!state.isPositionOccupied(opening)) {
-        return opening;
-      }
-    }
-
-    GridPosition bestPosition = emptyPositions.first;
-    int bestScore = -100000000;
-
-    for (final pos in emptyPositions) {
-      final nextState = GameLogic.placePiece(state, pos);
-      if (identical(nextState, state)) continue;
-
-      final score = _evaluatePlacement(pos, nextState);
-      if (score > bestScore) {
-        bestScore = score;
-        bestPosition = pos;
-      }
-    }
-
-    return bestPosition;
+    // Renforce spécifiquement la réponse quand l'humain commence.
+    final preferredOpeningCounter = _getPreferredOpeningCounterMove(state);
+    return _findBestPlacementWithLookahead(
+      state,
+      preferredMove: preferredOpeningCounter,
+    );
   }
 
   GridPosition? _findImmediateWinningPlacement(GameState state, Player player) {
@@ -182,6 +167,137 @@ class MasterAI extends FanoronaAI {
     score -= opponentWinningChances * 850;
 
     return score;
+  }
+
+  GridPosition _findBestPlacementWithLookahead(
+    GameState state, {
+    GridPosition? preferredMove,
+  }) {
+    final emptyPositions = _getEmptyPositions(state);
+    if (emptyPositions.isEmpty) {
+      return const GridPosition(0, 0);
+    }
+
+    final lookaheadDepth = _getPlacementLookaheadDepth(state);
+    GridPosition bestMove = emptyPositions.first;
+    int bestScore = -100000000;
+    int alpha = -100000000;
+    const int beta = 100000000;
+
+    for (final move in emptyPositions) {
+      final nextState = GameLogic.placePiece(state, move);
+      if (identical(nextState, state)) continue;
+
+      int score = _placementMinimax(nextState, lookaheadDepth - 1, alpha, beta);
+      score += _positionalValues[move] ?? 0;
+      score += _evaluatePlacement(move, nextState) ~/ 4;
+
+      if (preferredMove != null && move == preferredMove) {
+        score += 260;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+
+      alpha = alpha > bestScore ? alpha : bestScore;
+    }
+
+    return bestMove;
+  }
+
+  int _placementMinimax(GameState state, int depth, int alpha, int beta) {
+    if (depth <= 0 ||
+        state.status != GameStatus.playing ||
+        !state.isPlacementPhase) {
+      return AIGameLogic.evaluateAggressivePosition(state, Player.player2);
+    }
+
+    final moves = _getEmptyPositions(state);
+    if (moves.isEmpty) {
+      return AIGameLogic.evaluateAggressivePosition(state, Player.player2);
+    }
+
+    final maximizing = state.currentPlayer == Player.player2;
+    int bestScore = maximizing ? -100000000 : 100000000;
+
+    for (final move in moves) {
+      final nextState = GameLogic.placePiece(state, move);
+      if (identical(nextState, state)) continue;
+
+      final score = _placementMinimax(nextState, depth - 1, alpha, beta);
+
+      if (maximizing) {
+        if (score > bestScore) bestScore = score;
+        if (score > alpha) alpha = score;
+        if (alpha >= beta) break;
+      } else {
+        if (score < bestScore) bestScore = score;
+        if (score < beta) beta = score;
+        if (beta <= alpha) break;
+      }
+    }
+
+    return bestScore;
+  }
+
+  int _getPlacementLookaheadDepth(GameState state) {
+    final remainingPlacements =
+        (GameConstants.piecesPerPlayer * 2) - state.pieces.length;
+    if (remainingPlacements <= 0) return 1;
+
+    // Quand l'humain commence, on cherche plus loin sur l'ouverture.
+    final isRespondingToHumanOpening =
+        state.isPlacementPhase &&
+        state.currentPlayer == Player.player2 &&
+        state.turnsPlayed == 1;
+
+    final baseDepth = isRespondingToHumanOpening ? 5 : 4;
+    return remainingPlacements < baseDepth ? remainingPlacements : baseDepth;
+  }
+
+  GridPosition? _getPreferredOpeningCounterMove(GameState state) {
+    final openingFallback = OpeningBook.getBestOpeningMove(state);
+    GridPosition? preferred = openingFallback;
+
+    final isRespondingToHumanOpening =
+        state.isPlacementPhase &&
+        state.currentPlayer == Player.player2 &&
+        state.turnsPlayed == 1;
+
+    if (!isRespondingToHumanOpening) {
+      return preferred;
+    }
+
+    final firstHumanPiece = state.player1Pieces.isNotEmpty
+        ? state.player1Pieces.first.position
+        : null;
+    if (firstHumanPiece != null) {
+      final bookResponse = OpeningBook.getResponseToOpponentOpening(
+        state,
+        firstHumanPiece,
+      );
+      if (bookResponse != null && !state.isPositionOccupied(bookResponse)) {
+        preferred = bookResponse;
+      }
+    }
+
+    return preferred;
+  }
+
+  int _getAdaptiveMasterDepth(GameState state) {
+    int depth = GameConstants.masterDepth + 1;
+
+    // Si l'IA joue en second (humain commence), on pousse un peu la profondeur
+    // en début de mouvement pour compenser l'initiative adverse.
+    final humanStarted = state.turnsPlayed.isOdd;
+    final earlyMovement = state.isMovementPhase && state.turnsPlayed <= 11;
+    if (humanStarted && earlyMovement) {
+      depth += 1;
+    }
+
+    return depth;
   }
 
   AIMove? _findBestDefensiveMove(GameState state) {
