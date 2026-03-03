@@ -9,6 +9,8 @@ class ProfileService {
   static const String _nameKey = 'profile_name';
   static const String _avatarPathKey = 'profile_avatar_path';
   static const String _setupDoneKey = 'profile_setup_done';
+  static const String _networkProfilePromptSeenKey =
+      'network_profile_prompt_seen';
 
   static Future<PlayerProfile> loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
@@ -66,6 +68,17 @@ class ProfileService {
     final profile = await loadProfile();
     final avatarPath = profile.avatarPath;
     return avatarPath != null && avatarPath.isNotEmpty;
+  }
+
+  static Future<bool> markNetworkProfilePromptIfFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyShown = prefs.getBool(_networkProfilePromptSeenKey) ?? false;
+    if (alreadyShown) {
+      return false;
+    }
+
+    await prefs.setBool(_networkProfilePromptSeenKey, true);
+    return true;
   }
 
   static Future<String?> avatarPathToBase64(String? avatarPath) async {

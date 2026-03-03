@@ -8,7 +8,9 @@ import '../profile/player_profile.dart';
 import '../profile/profile_service.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({super.key, this.requireAvatarForNetwork = false});
+
+  final bool requireAvatarForNetwork;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -62,18 +64,66 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    final avatarPath = _avatarPath;
+    final hasAvatar =
+        avatarPath != null &&
+        avatarPath.isNotEmpty &&
+        File(avatarPath).existsSync();
+
+    if (widget.requireAvatarForNetwork && !hasAvatar) {
+      await _showAvatarRequiredDialog();
+      return;
+    }
+
     final name = _nameController.text.trim();
     final normalizedName = name.isEmpty ? PlayerProfile.fallback.name : name;
 
-    final profile = PlayerProfile(name: normalizedName, avatarPath: _avatarPath);
+    final profile = PlayerProfile(
+      name: normalizedName,
+      avatarPath: _avatarPath,
+    );
     await ProfileService.saveProfile(profile);
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profil enregistré.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profil enregistré.')));
     Navigator.pop(context);
+  }
+
+  Future<void> _showAvatarRequiredDialog() async {
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: GameConstants.backgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: GameConstants.neonPink),
+          ),
+          title: Text(
+            'Photo obligatoire',
+            style: TextStyle(
+              color: GameConstants.neonPink,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            'Ajoutez une photo de profil pour jouer en réseau.',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _removeAvatar() {
@@ -93,8 +143,9 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    final avatarFile =
-        _avatarPath != null && _avatarPath!.isNotEmpty ? File(_avatarPath!) : null;
+    final avatarFile = _avatarPath != null && _avatarPath!.isNotEmpty
+        ? File(_avatarPath!)
+        : null;
 
     return Scaffold(
       backgroundColor: GameConstants.backgroundColor,
@@ -130,7 +181,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       height: 120,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: GameConstants.gridColor, width: 2),
+                        border: Border.all(
+                          color: GameConstants.gridColor,
+                          width: 2,
+                        ),
                         color: Colors.black.withAlpha(55),
                       ),
                       child: ClipOval(
@@ -195,7 +249,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   filled: true,
                   fillColor: Colors.black.withAlpha(70),
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: GameConstants.gridColor.withAlpha(130)),
+                    borderSide: BorderSide(
+                      color: GameConstants.gridColor.withAlpha(130),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   focusedBorder: OutlineInputBorder(
@@ -212,7 +268,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   foregroundColor: Colors.white,
                   side: BorderSide(color: GameConstants.gridColor),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text(
                   'Enregistrer',

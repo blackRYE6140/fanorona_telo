@@ -10,6 +10,38 @@ import 'network/lan_lobby_page.dart';
 class TwoPlayersOptionsPage extends StatelessWidget {
   const TwoPlayersOptionsPage({super.key});
 
+  Future<void> _showNetworkProfileRequiredPopup(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: GameConstants.backgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: GameConstants.gridColor),
+          ),
+          title: Text(
+            'Mise à jour profil',
+            style: TextStyle(
+              color: GameConstants.gridColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            'Avant d\'affronter vos amis en réseau, veuillez mettre à jour votre profil (photo obligatoire).',
+            style: TextStyle(color: Colors.white),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Continuer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _openNetworkLobbyWithProfileGate(
     BuildContext context,
     Widget lobbyPage,
@@ -20,9 +52,24 @@ class TwoPlayersOptionsPage extends StatelessWidget {
     }
 
     if (!isConfigured) {
+      final shouldShowPrompt =
+          await ProfileService.markNetworkProfilePromptIfFirstTime();
+      if (!context.mounted) {
+        return;
+      }
+
+      if (shouldShowPrompt) {
+        await _showNetworkProfileRequiredPopup(context);
+        if (!context.mounted) {
+          return;
+        }
+      }
+
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const ProfilePage()),
+        MaterialPageRoute(
+          builder: (_) => const ProfilePage(requireAvatarForNetwork: true),
+        ),
       );
 
       if (!context.mounted) {
@@ -35,13 +82,7 @@ class TwoPlayersOptionsPage extends StatelessWidget {
       }
 
       if (!isConfigured) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Veuillez ajouter une photo de profil pour jouer en réseau.',
-            ),
-          ),
-        );
+        await _showNetworkProfileRequiredPopup(context);
         return;
       }
     }
