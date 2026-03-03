@@ -5,7 +5,7 @@ import 'ui/home_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await dotenv.load(fileName: '.env');
+    await dotenv.load(fileName: 'assets/env/app.env');
   } catch (_) {
     // Optional: app can still run using --dart-define or saved preferences.
   }

@@ -88,10 +88,10 @@ Par défaut, il écoute sur `PORT=8080`.
 3. Configurer Flutter avec l'URL relay:
 
 ```bash
-cp .env.example .env
+cp assets/env/app.env.example assets/env/app.env
 ```
 
-Dans `.env`, mettre:
+Dans `assets/env/app.env`, mettre:
 
 ```env
 FANORONA_RELAY_URL=wss://votre-relay.onrender.com
