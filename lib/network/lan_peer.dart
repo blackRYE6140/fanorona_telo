@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-class LanPeer {
+import 'game_peer.dart';
+
+class LanPeer implements GamePeer {
   LanPeer(this.socket) {
     _subscription = socket.listen(
       _onData,
@@ -30,6 +32,7 @@ class LanPeer {
   StreamSubscription<List<int>>? _subscription;
   String _buffer = '';
 
+  @override
   Stream<Map<String, dynamic>> get messages => _messagesController.stream;
 
   void _onData(List<int> data) {
@@ -64,6 +67,7 @@ class LanPeer {
     }
   }
 
+  @override
   void send(Map<String, dynamic> message) {
     try {
       socket.write('${jsonEncode(message)}\n');
@@ -72,6 +76,7 @@ class LanPeer {
     }
   }
 
+  @override
   Future<void> dispose() async {
     await _subscription?.cancel();
     _subscription = null;

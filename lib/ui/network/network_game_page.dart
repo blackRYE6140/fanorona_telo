@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../game/constants.dart';
 import '../../game/game_state.dart';
-import '../../network/lan_peer.dart';
+import '../../network/game_peer.dart';
 import '../../network/network_codec.dart';
 import '../game_board.dart';
 
@@ -21,7 +21,7 @@ class NetworkGamePage extends StatefulWidget {
     this.remoteAvatarBase64,
   });
 
-  final LanPeer peer;
+  final GamePeer peer;
   final GameState initialState;
   final Player localPlayer;
   final String localName;

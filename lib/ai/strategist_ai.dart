@@ -270,6 +270,6 @@ class StrategistAI extends FanoronaAI {
         }
       }
     }
-    return empty;
+    return empty; 
   }
 }

@@ -2,43 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../game/constants.dart';
 import 'game_page.dart';
+import 'network/internet_lobby_page.dart';
 import 'network/lan_lobby_page.dart';
 
 class TwoPlayersOptionsPage extends StatelessWidget {
   const TwoPlayersOptionsPage({super.key});
-
-  void _showInternetComingSoon(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: GameConstants.backgroundColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: GameConstants.gridColor),
-          ),
-          title: Text(
-            'Mode Internet',
-            style: TextStyle(
-              color: GameConstants.gridColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: const Text(
-            'Le mode à distance via internet est prévu. '
-            'On commence par le mode socket en réseau local.',
-            style: TextStyle(color: Colors.white),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +89,14 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                         title: 'CONNEXION INTERNET',
                         subtitle: '2 téléphones à distance',
                         color: GameConstants.neonPink,
-                        onTap: () => _showInternetComingSoon(context),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const InternetLobbyPage(),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

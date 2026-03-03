@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'ui/home_page.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // Optional: app can still run using --dart-define or saved preferences.
+  }
   runApp(const FanoronaTeloApp());
 }
 

@@ -5,6 +5,8 @@ Jeu **Fanorona Telo** (grille 3x3) en Flutter, avec mode 2 joueurs local et mode
 ## 1) Fonctionnalités
 
 - Mode `2 Joueurs`.
+- Mode `2 Joueurs` en `socket réseau local` (host/join via QR code).
+- Mode `2 Joueurs` en `connexion internet` (Inviter amis / Rejoindre amis avec liste en direct nom + ID).
 - Mode `Contre IA` avec 2 difficultés:
   - `Stratège` (plus intelligent qu'avant, mais volontairement battable).
   - `Maître` (analyse plus profonde et plus agressive).
@@ -62,6 +64,54 @@ flutter build apk --split-per-abi
 flutter build web --release
 npx serve build/web
 ```
+
+### Connexion internet: Express + WebSocket
+
+Le relay est dans `backend/relay-express` (Node.js + Express + ws).
+
+1. Créer la config backend:
+
+```bash
+cp backend/relay-express/.env.example backend/relay-express/.env
+```
+
+2. Démarrer le backend en local:
+
+```bash
+cd backend/relay-express
+npm install
+npm start
+```
+
+Par défaut, il écoute sur `PORT=8080`.
+
+3. Configurer Flutter avec l'URL relay:
+
+```bash
+cp .env.example .env
+```
+
+Dans `.env`, mettre:
+
+```env
+FANORONA_RELAY_URL=wss://votre-relay.onrender.com
+```
+
+4. Lancer Flutter:
+
+```bash
+flutter pub get
+flutter run
+```
+
+Notes:
+- En local réseau, vous pouvez tester avec `ws://IP_LOCALE:8080`.
+- Sur internet (2 téléphones à distance), utilisez `wss://...` (Render).
+- Fallback possible: `--dart-define=FANORONA_RELAY_URL=...`.
+
+Flux in-app:
+- `Inviter amis`: publie automatiquement le nom et l'ID de connexion.
+- `Rejoindre amis`: affiche la liste des invitations (nom + ID), puis connexion en un clic.
 
 ## 4) Architecture rapide
 
