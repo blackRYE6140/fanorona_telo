@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>La caméra est utilisée pour scanner le QR code de la partie réseau.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La galerie est utilisée pour choisir votre image de profil.</string>
 </dict>
 </plist>

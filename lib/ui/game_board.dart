@@ -9,11 +9,13 @@ import '../utils/position_utils.dart';
 class GameBoard extends StatefulWidget {
   final GameState gameState;
   final Function(GameState) onStateChanged;
+  final Player? interactivePlayer;
   
   const GameBoard({
     super.key,
     required this.gameState,
     required this.onStateChanged,
+    this.interactivePlayer,
   });
   
   @override
@@ -23,6 +25,14 @@ class GameBoard extends StatefulWidget {
 class _GameBoardState extends State<GameBoard> {
   // ignore: unused_field
   Size _boardSize = Size.zero;
+
+  bool get _isInteractiveTurn {
+    final interactivePlayer = widget.interactivePlayer;
+    if (interactivePlayer == null) {
+      return true;
+    }
+    return widget.gameState.currentPlayer == interactivePlayer;
+  }
   
   // Méthode pour obtenir le padding dynamique
   double get _dynamicPadding {
@@ -71,7 +81,8 @@ class _GameBoardState extends State<GameBoard> {
               ),
               
               // Indicateurs de mouvement possibles (si une pièce est sélectionnée)
-              if (widget.gameState.isMovementPhase && 
+              if (_isInteractiveTurn &&
+                  widget.gameState.isMovementPhase && 
                   widget.gameState.selectedPiece != null)
                 ..._buildPossibleMoves(boardSize),
               
@@ -79,11 +90,12 @@ class _GameBoardState extends State<GameBoard> {
               ..._buildPieces(boardSize),
               
               // Zones de drop pour le drag & drop
-              if (widget.gameState.isMovementPhase)
+              if (_isInteractiveTurn && widget.gameState.isMovementPhase)
                 ..._buildDropTargets(boardSize),
               
               // Overlay pour les clics (phase placement)
-              if (widget.gameState.isPlacementPhase &&
+              if (_isInteractiveTurn &&
+                  widget.gameState.isPlacementPhase &&
                   widget.gameState.status == GameStatus.playing)
                 _buildPlacementOverlay(boardSize),
             ],
@@ -173,6 +185,7 @@ class _GameBoardState extends State<GameBoard> {
       final screenPos = PositionUtils.gridToScreen(piece.position, boardSize, padding: _dynamicPadding);
       final isSelected = widget.gameState.selectedPiece == piece;
       final isDraggable = widget.gameState.isMovementPhase &&
+          _isInteractiveTurn &&
           piece.player == widget.gameState.currentPlayer &&
           widget.gameState.status == GameStatus.playing;
       
@@ -253,6 +266,8 @@ class _GameBoardState extends State<GameBoard> {
   }
   
   void _onBoardTapped(GridPosition gridPos) {
+    if (!_isInteractiveTurn) return;
+
     if (widget.gameState.isPlacementPhase &&
         widget.gameState.status == GameStatus.playing) {
       final newState = GameLogic.placePiece(widget.gameState, gridPos);
@@ -261,6 +276,8 @@ class _GameBoardState extends State<GameBoard> {
   }
   
   void _onPieceTapped(GamePiece piece) {
+    if (!_isInteractiveTurn) return;
+
     if (widget.gameState.isMovementPhase &&
         piece.player == widget.gameState.currentPlayer &&
         widget.gameState.status == GameStatus.playing) {
@@ -274,6 +291,8 @@ class _GameBoardState extends State<GameBoard> {
   }
   
   void _onDragStarted(GamePiece piece) {
+    if (!_isInteractiveTurn) return;
+
     if (widget.gameState.isMovementPhase &&
         piece.player == widget.gameState.currentPlayer &&
         widget.gameState.status == GameStatus.playing) {
@@ -284,6 +303,8 @@ class _GameBoardState extends State<GameBoard> {
   }
   
   void _onPieceDropped(GamePiece piece, GridPosition newGridPos) {
+    if (!_isInteractiveTurn) return;
+
     if (widget.gameState.isMovementPhase &&
         widget.gameState.status == GameStatus.playing) {
       
