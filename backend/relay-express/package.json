@@ -1,0 +1,19 @@
+{
+  "name": "fanorona-relay-express",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Express + WebSocket relay server for Fanorona Telo internet mode",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.1"
+  }
+}
