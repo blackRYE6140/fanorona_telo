@@ -310,6 +310,35 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     return localWon ? Colors.greenAccent : Colors.redAccent;
   }
 
+  void _replayNetworkGame() {
+    if (!mounted) {
+      return;
+    }
+
+    if (_peerDisconnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Connexion interrompue. Rejouer impossible.'),
+        ),
+      );
+      return;
+    }
+
+    final restartedState = GameState.initial().copyWith(
+      currentPlayer: widget.initialState.currentPlayer,
+    );
+
+    setState(() {
+      _gameState = restartedState;
+      _shownGameResult = null;
+    });
+
+    widget.peer.send({
+      'type': 'state',
+      'state': NetworkCodec.gameStateToMap(restartedState),
+    });
+  }
+
   Future<void> _showWinnerDialog(GameStatus status) async {
     final localWon =
         (status == GameStatus.player1Won && _localIsPlayer1) ||
@@ -343,7 +372,14 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                 _isLeavingGame = true;
                 Navigator.pop(context);
               },
-              child: const Text('Retour'),
+              child: const Text('Quitter'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _replayNetworkGame();
+              },
+              child: const Text('Rejouer'),
             ),
           ],
         );
@@ -476,15 +512,26 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                       onPressed: _handleExitPressed,
                     ),
                     const Expanded(
-                      child: Text(
-                        'PARTIE RÉSEAU',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          letterSpacing: 1.1,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'PARTIE RÉSEAU',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.sms_outlined,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 48),
