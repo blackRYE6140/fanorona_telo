@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fanorona Telo APK</title>
+    <meta
+      name="description"
+      content="Telecharge automatiquement la bonne version APK Fanorona Telo selon ton appareil Android."
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1>Fanorona Telo</h1>
+      <p class="subtitle">Un seul bouton. Le site choisit automatiquement le bon APK Android.</p>
+
+      <button id="download-btn" class="download-btn" type="button">Telecharger</button>
+      <p id="status" class="status" aria-live="polite"></p>
+
+      <section id="manual" class="manual" hidden>
+        <h2>Choix manuel</h2>
+        <p>Si la detection n'est pas fiable, utilise un lien direct :</p>
+        <ul>
+          <li><a href="/apks/app-arm64-v8a-release.apk">ARM64 (64-bit) - recommande</a></li>
+          <li><a href="/apks/app-armeabi-v7a-release.apk">ARMv7 (32-bit)</a></li>
+          <li><a href="/apks/app-x86_64-release.apk">x86_64 (64-bit)</a></li>
+        </ul>
+      </section>
+
+      <p class="note">
+        Note: Android demande une confirmation manuelle pour installer un APK (ce n'est pas une installation silencieuse comme Play Store).
+      </p>
+    </main>
+
+    <script src="/assets/app.js" defer></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/sw.js").catch(function () {
+            // Ignore service worker errors for a non-blocking setup.
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

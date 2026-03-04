@@ -1,0 +1,11 @@
+{
+  "name": "Fanorona Telo APK Download",
+  "short_name": "Fanorona APK",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8ff",
+  "theme_color": "#0e7490",
+  "description": "Telechargement intelligent de APK Fanorona Telo selon l'architecture Android",
+  "icons": []
+}
