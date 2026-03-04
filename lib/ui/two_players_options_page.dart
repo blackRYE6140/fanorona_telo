@@ -92,7 +92,19 @@ class TwoPlayersOptionsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSmallScreen = MediaQuery.of(context).size.height < 600;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 600;
+    final isLargeScreen = screenHeight >= 800;
+    final topSpacing = isSmallScreen
+        ? 22.0
+        : isLargeScreen
+        ? 14.0
+        : 24.0;
+    final cardSpacing = isSmallScreen
+        ? 16.0
+        : isLargeScreen
+        ? 14.0
+        : 22.0;
 
     return Scaffold(
       backgroundColor: GameConstants.backgroundColor,
@@ -127,7 +139,7 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                   fontSize: isSmallScreen ? 13 : 15,
                 ),
               ),
-              SizedBox(height: isSmallScreen ? 22 : 30),
+              SizedBox(height: topSpacing),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -148,12 +160,13 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                           );
                         },
                       ),
-                      SizedBox(height: isSmallScreen ? 16 : 24),
+                      SizedBox(height: cardSpacing),
                       _buildModeCard(
                         context,
                         icon: Icons.wifi,
-                        title: 'SOCKET RÉSEAU LOCAL',
-                        subtitle: '2 téléphones sur le même Wi-Fi',
+                        title: 'RÉSEAU LOCAL (WI-FI)',
+                        subtitle:
+                            '2 téléphones sur le même Wi-Fi ou point d\'accès',
                         color: GameConstants.neonBlue,
                         onTap: () async {
                           await _openNetworkLobbyWithProfileGate(
@@ -162,7 +175,7 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                           );
                         },
                       ),
-                      SizedBox(height: isSmallScreen ? 16 : 24),
+                      SizedBox(height: cardSpacing),
                       _buildModeCard(
                         context,
                         icon: Icons.public,
@@ -195,12 +208,34 @@ class TwoPlayersOptionsPage extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
-    final isSmallScreen = MediaQuery.of(context).size.height < 600;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenHeight < 600;
+    final isLargeScreen = screenHeight >= 800;
+    final cardPadding = isSmallScreen
+        ? 18.0
+        : isLargeScreen
+        ? 20.0
+        : 24.0;
+    final iconPadding = isSmallScreen
+        ? 10.0
+        : isLargeScreen
+        ? 12.0
+        : 14.0;
+    final iconSize = isSmallScreen
+        ? 26.0
+        : isLargeScreen
+        ? 28.0
+        : 30.0;
+    final titleSize = isSmallScreen
+        ? 16.0
+        : isLargeScreen
+        ? 18.0
+        : 20.0;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(isSmallScreen ? 18 : 24),
+        padding: EdgeInsets.all(cardPadding),
         decoration: BoxDecoration(
           color: color.withAlpha(22),
           borderRadius: BorderRadius.circular(18),
@@ -216,12 +251,12 @@ class TwoPlayersOptionsPage extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
+              padding: EdgeInsets.all(iconPadding),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color.withAlpha(50),
               ),
-              child: Icon(icon, color: color, size: isSmallScreen ? 26 : 30),
+              child: Icon(icon, color: color, size: iconSize),
             ),
             SizedBox(width: isSmallScreen ? 14 : 18),
             Expanded(
@@ -232,7 +267,7 @@ class TwoPlayersOptionsPage extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: isSmallScreen ? 16 : 20,
+                      fontSize: titleSize,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

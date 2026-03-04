@@ -19,20 +19,31 @@ class InternetLobbyPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              IconButton(
-                alignment: Alignment.centerLeft,
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              SizedBox(height: isSmallScreen ? 12 : 24),
-              Text(
-                'CONNEXION INTERNET',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallScreen ? 24 : 32,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    alignment: Alignment.centerLeft,
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'CONNEXION INTERNET',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isSmallScreen ? 24 : 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.sms_outlined,
+                    color: Colors.white.withAlpha(210),
+                    size: isSmallScreen ? 24 : 28,
+                  ),
+                  const SizedBox(width: 12),
+                ],
               ),
               const SizedBox(height: 10),
               Text(

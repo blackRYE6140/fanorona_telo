@@ -329,6 +329,55 @@ class _GamePageState extends State<GamePage> {
     );
   }
 
+  Future<bool> _confirmExitGame() async {
+    final shouldExit =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              backgroundColor: GameConstants.backgroundColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: GameConstants.gridColor),
+              ),
+              title: Text(
+                'Quitter la partie ?',
+                style: TextStyle(
+                  color: GameConstants.gridColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Text(
+                widget.mode == GameMode.vsAI
+                    ? 'La partie contre l\'IA sera abandonnée.'
+                    : 'La partie en cours sera abandonnée.',
+                style: const TextStyle(color: Colors.white),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Annuler'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Quitter'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+    return shouldExit;
+  }
+
+  Future<void> _handleExitPressed() async {
+    final shouldExit = await _confirmExitGame();
+    if (!mounted || !shouldExit) {
+      return;
+    }
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -337,129 +386,137 @@ class _GamePageState extends State<GamePage> {
     // ignore: unused_local_variable
     final isSmallScreen = screenHeight < 600;
 
-    return Scaffold(
-      backgroundColor: GameConstants.backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isVerySmallScreen ? 8.0 : 12.0,
-            vertical: isVerySmallScreen ? 4.0 : 8.0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // En-tête avec bouton retour
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                      size: isVerySmallScreen ? 20.0 : 24.0,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          widget.mode == GameMode.vsAI
-                              ? GameConstants.vsAI
-                              : GameConstants.vsPlayer,
-                          style: TextStyle(
-                            fontSize: isVerySmallScreen ? 16.0 : 20.0,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (widget.mode == GameMode.vsAI && _ai != null)
-                          Text(
-                            _ai!.name,
-                            style: TextStyle(
-                              fontSize: isVerySmallScreen ? 12.0 : 14.0,
-                              color: _ai!.color,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
-
-              // Plateau de jeu
-              Expanded(
-                flex: isVerySmallScreen ? 7 : 5,
-                child: GameBoard(
-                  gameState: _gameState,
-                  onStateChanged: _handleStateChanged,
-                ),
-              ),
-
-              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
-
-              // Infos de jeu
-              Container(
-                padding: EdgeInsets.all(isVerySmallScreen ? 6.0 : 10.0),
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(76),
-                  borderRadius: BorderRadius.circular(
-                    isVerySmallScreen ? 6.0 : 10.0,
-                  ),
-                  border: Border.all(
-                    color: GameConstants.gridColor.withAlpha(76),
-                    width: 1,
-                  ),
-                ),
-                child: _buildGameInfo(isVerySmallScreen),
-              ),
-
-              SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
-
-              // Boutons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _resetGame,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: GameConstants.gridColor.withAlpha(51),
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(
-                          vertical: isVerySmallScreen ? 10.0 : 14.0,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            isVerySmallScreen ? 6.0 : 8.0,
-                          ),
-                          side: BorderSide(color: GameConstants.gridColor),
-                        ),
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        final shouldExit = await _confirmExitGame();
+        if (!mounted || !shouldExit) {
+          return;
+        }
+        Navigator.of(this.context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: GameConstants.backgroundColor,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isVerySmallScreen ? 8.0 : 12.0,
+              vertical: isVerySmallScreen ? 4.0 : 8.0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // En-tête avec bouton retour
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: isVerySmallScreen ? 20.0 : 24.0,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      onPressed: _handleExitPressed,
+                    ),
+                    Expanded(
+                      child: Column(
                         children: [
-                          Icon(
-                            Icons.refresh,
-                            size: isVerySmallScreen ? 16.0 : 20.0,
-                          ),
-                          SizedBox(width: isVerySmallScreen ? 6.0 : 8.0),
                           Text(
-                            'Nouvelle Partie',
+                            widget.mode == GameMode.vsAI
+                                ? GameConstants.vsAI
+                                : GameConstants.vsPlayer,
                             style: TextStyle(
-                              fontSize: isVerySmallScreen ? 12.0 : 14.0,
+                              fontSize: isVerySmallScreen ? 16.0 : 20.0,
                               fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
+                          if (widget.mode == GameMode.vsAI && _ai != null)
+                            Text(
+                              _ai!.name,
+                              style: TextStyle(
+                                fontSize: isVerySmallScreen ? 12.0 : 14.0,
+                                color: _ai!.color,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+                SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
+                // Plateau de jeu
+                Expanded(
+                  flex: isVerySmallScreen ? 7 : 5,
+                  child: GameBoard(
+                    gameState: _gameState,
+                    onStateChanged: _handleStateChanged,
                   ),
-                ],
-              ),
-            ],
+                ),
+                SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
+                // Infos de jeu
+                Container(
+                  padding: EdgeInsets.all(isVerySmallScreen ? 6.0 : 10.0),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(76),
+                    borderRadius: BorderRadius.circular(
+                      isVerySmallScreen ? 6.0 : 10.0,
+                    ),
+                    border: Border.all(
+                      color: GameConstants.gridColor.withAlpha(76),
+                      width: 1,
+                    ),
+                  ),
+                  child: _buildGameInfo(isVerySmallScreen),
+                ),
+                SizedBox(height: isVerySmallScreen ? 4.0 : 8.0),
+                // Boutons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _resetGame,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: GameConstants.gridColor.withAlpha(
+                            51,
+                          ),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isVerySmallScreen ? 10.0 : 14.0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              isVerySmallScreen ? 6.0 : 8.0,
+                            ),
+                            side: BorderSide(color: GameConstants.gridColor),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.refresh,
+                              size: isVerySmallScreen ? 16.0 : 20.0,
+                            ),
+                            SizedBox(width: isVerySmallScreen ? 6.0 : 8.0),
+                            Text(
+                              'Nouvelle Partie',
+                              style: TextStyle(
+                                fontSize: isVerySmallScreen ? 12.0 : 14.0,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -504,7 +561,7 @@ class _GamePageState extends State<GamePage> {
                   ),
                 ),
                 Text(
-                  '${_gameState.turnsPlayed + 1}',
+                  '${_gameState.turnsPlayed}',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: isVerySmallScreen ? 14.0 : 18.0,

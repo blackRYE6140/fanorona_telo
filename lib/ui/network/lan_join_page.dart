@@ -36,8 +36,9 @@ class _LanJoinPageState extends State<LanJoinPage> {
   bool _scanLocked = false;
   bool _navigatingToGame = false;
 
-  String _statusText = 'Scannez le QR code affiché sur le téléphone host.';
-  String _hostName = 'Host';
+  String _statusText =
+      'Scannez le QR code affiché sur le téléphone qui crée la partie.';
+  String _hostName = 'Créateur';
 
   @override
   void initState() {
@@ -89,6 +90,9 @@ class _LanJoinPageState extends State<LanJoinPage> {
   }
 
   void _handleDetect(BarcodeCapture capture) {
+    if (!mounted) {
+      return;
+    }
     if (_loadingProfile || _scanLocked || _connecting || _navigatingToGame) {
       return;
     }
@@ -109,14 +113,14 @@ class _LanJoinPageState extends State<LanJoinPage> {
     final payload = LanUtils.parseQrPayload(rawValue);
     if (payload == null) {
       setState(() {
-        _statusText = 'QR invalide. Veuillez scanner le QR du host.';
+        _statusText = 'QR invalide. Veuillez scanner le QR du créateur.';
       });
       return;
     }
 
     setState(() {
       _scanLocked = true;
-      _statusText = 'QR détecté. Connexion au host...';
+      _statusText = 'QR détecté. Connexion à la partie...';
     });
     unawaited(_connectToHost(payload));
   }
@@ -167,7 +171,7 @@ class _LanJoinPageState extends State<LanJoinPage> {
       }
       setState(() {
         _connecting = false;
-        _statusText = 'Connecté. En attente de démarrage par le host...';
+        _statusText = 'Connecté. En attente du démarrage...';
       });
     } catch (_) {
       if (!mounted) {
@@ -195,8 +199,11 @@ class _LanJoinPageState extends State<LanJoinPage> {
         return;
       }
       setState(() {
-        _hostName = (hostName == null || hostName.isEmpty) ? 'Host' : hostName;
-        _statusText = 'Connecté à $_hostName. Le host choisit qui commence.';
+        _hostName = (hostName == null || hostName.isEmpty)
+            ? 'Créateur'
+            : hostName;
+        _statusText =
+            'Connecté à $_hostName. Cette personne choisit qui commence.';
       });
       return;
     }
@@ -216,6 +223,9 @@ class _LanJoinPageState extends State<LanJoinPage> {
       }
 
       if (stateMap == null) {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _statusText = 'Données de partie invalides.';
           _scanLocked = false;
@@ -231,7 +241,7 @@ class _LanJoinPageState extends State<LanJoinPage> {
           : Player.player1;
       final initialState = NetworkCodec.gameStateFromMap(stateMap);
 
-      final hostName = ((message['hostName'] as String?) ?? 'Host').trim();
+      final hostName = ((message['hostName'] as String?) ?? 'Créateur').trim();
       final guestName = ((message['guestName'] as String?) ?? _profile.name)
           .trim();
       final hostAvatar = message['hostAvatar'] as String?;
@@ -255,7 +265,7 @@ class _LanJoinPageState extends State<LanJoinPage> {
             initialState: initialState,
             localPlayer: localPlayer,
             localName: guestName.isEmpty ? _profile.name : guestName,
-            remoteName: hostName.isEmpty ? 'Host' : hostName,
+            remoteName: hostName.isEmpty ? 'Créateur' : hostName,
             localAvatarBase64: guestAvatar,
             remoteAvatarBase64: hostAvatar,
           ),
@@ -309,8 +319,9 @@ class _LanJoinPageState extends State<LanJoinPage> {
     setState(() {
       _connecting = false;
       _scanLocked = false;
-      _statusText = 'Scannez le QR code affiché sur le téléphone host.';
-      _hostName = 'Host';
+      _statusText =
+          'Scannez le QR code affiché sur le téléphone qui crée la partie.';
+      _hostName = 'Créateur';
     });
 
     try {
@@ -338,7 +349,7 @@ class _LanJoinPageState extends State<LanJoinPage> {
                   ),
                   const Expanded(
                     child: Text(
-                      'JOIN SOCKET',
+                      'REJOINDRE LA PARTIE',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,

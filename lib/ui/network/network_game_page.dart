@@ -38,6 +38,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   StreamSubscription<Map<String, dynamic>>? _peerSubscription;
   bool _peerDisconnected = false;
   GameStatus? _shownGameResult;
+  bool _isLeavingGame = false;
+  bool _disconnectDialogShown = false;
 
   @override
   void initState() {
@@ -47,16 +49,16 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     _peerSubscription = widget.peer.messages.listen(
       _handleIncomingMessage,
       onDone: () {
-        if (!mounted) return;
-        setState(() {
-          _peerDisconnected = true;
-        });
+        _handlePeerDisconnected(
+          'Connexion interrompue. ${widget.remoteName} est déconnecté.',
+        );
       },
     );
   }
 
   @override
   void dispose() {
+    _isLeavingGame = true;
     _peerSubscription?.cancel();
     widget.peer.dispose();
     super.dispose();
@@ -66,6 +68,9 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     final type = message['type'] as String?;
 
     if (type == 'state') {
+      if (_peerDisconnected) {
+        return;
+      }
       final rawState = message['state'];
       Map<String, dynamic>? stateMap;
       if (rawState is Map<String, dynamic>) {
@@ -87,10 +92,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     }
 
     if (type == 'leave') {
-      if (!mounted) return;
-      setState(() {
-        _peerDisconnected = true;
-      });
+      _handlePeerDisconnected('${widget.remoteName} a quitté la partie.');
       return;
     }
 
@@ -101,6 +103,136 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
         context,
       ).showSnackBar(SnackBar(content: Text(messageText)));
     }
+  }
+
+  void _handlePeerDisconnected(String reason) {
+    if (!mounted || _isLeavingGame || _peerDisconnected) {
+      return;
+    }
+
+    setState(() {
+      _peerDisconnected = true;
+    });
+
+    if (_gameState.status != GameStatus.playing) {
+      return;
+    }
+    _showPeerDisconnectedDialog(reason);
+  }
+
+  void _showPeerDisconnectedDialog(String reason) {
+    if (_disconnectDialogShown || _isLeavingGame) {
+      return;
+    }
+    _disconnectDialogShown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _isLeavingGame) {
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return PopScope<void>(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: GameConstants.backgroundColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Colors.orangeAccent, width: 1.6),
+              ),
+              title: const Text(
+                'Partie interrompue',
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Text(
+                reason,
+                style: const TextStyle(color: Colors.white),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Retour'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (!mounted || _isLeavingGame) {
+        return;
+      }
+      _isLeavingGame = true;
+      Navigator.pop(context);
+    });
+  }
+
+  Future<bool> _confirmExitGame() async {
+    if (_isLeavingGame || _disconnectDialogShown) {
+      return false;
+    }
+
+    final shouldExit =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              backgroundColor: GameConstants.backgroundColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: GameConstants.gridColor, width: 1.3),
+              ),
+              title: Text(
+                'Quitter la partie ?',
+                style: TextStyle(
+                  color: GameConstants.gridColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Text(
+                _peerDisconnected
+                    ? 'Vous allez retourner au menu.'
+                    : 'Votre adversaire sera déconnecté.',
+                style: const TextStyle(color: Colors.white),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Annuler'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('Quitter'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldExit) {
+      return false;
+    }
+
+    _isLeavingGame = true;
+    if (!_peerDisconnected) {
+      widget.peer.send({'type': 'leave'});
+    }
+    return true;
+  }
+
+  Future<void> _handleExitPressed() async {
+    final shouldExit = await _confirmExitGame();
+    if (!mounted || !shouldExit) {
+      return;
+    }
+    Navigator.pop(context);
   }
 
   void _handleLocalStateChanged(GameState newState) {
@@ -139,6 +271,12 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
 
   bool get _localIsPlayer1 => widget.localPlayer == Player.player1;
 
+  Color _pieceColorForPlayer(Player player) {
+    return player == Player.player1
+        ? GameConstants.neonPink
+        : GameConstants.neonBlue;
+  }
+
   String get _statusText {
     if (_peerDisconnected) {
       return 'Connexion interrompue';
@@ -163,9 +301,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     }
 
     if (_gameState.status == GameStatus.playing) {
-      return _gameState.currentPlayer == widget.localPlayer
-          ? GameConstants.gridColor
-          : Colors.white;
+      return _pieceColorForPlayer(_gameState.currentPlayer);
     }
 
     final localWon =
@@ -187,7 +323,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: GameConstants.backgroundColor,
           shape: RoundedRectangleBorder(
@@ -202,7 +338,9 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
+                if (!mounted) return;
+                _isLeavingGame = true;
                 Navigator.pop(context);
               },
               child: const Text('Retour'),
@@ -236,9 +374,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     required String? avatar,
   }) {
     final currentTurn = _gameState.currentPlayer == player;
-    final color = player == Player.player1
-        ? GameConstants.neonPink
-        : GameConstants.neonBlue;
+    final color = _pieceColorForPlayer(player);
 
     final avatarProvider = _avatarFromBase64(avatar);
 
@@ -287,6 +423,23 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withAlpha(200),
+                border: Border.all(color: color, width: 1.4),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withAlpha(120),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -297,89 +450,106 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   Widget build(BuildContext context) {
     final localIsPlayer1 = _localIsPlayer1;
 
-    return Scaffold(
-      backgroundColor: GameConstants.backgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () {
-                      widget.peer.send({'type': 'leave'});
-                      Navigator.pop(context);
-                    },
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'PARTIE RÉSEAU',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        letterSpacing: 1.1,
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        final shouldExit = await _confirmExitGame();
+        if (!mounted || !shouldExit) {
+          return;
+        }
+        Navigator.of(this.context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: GameConstants.backgroundColor,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: _handleExitPressed,
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'PARTIE RÉSEAU',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          letterSpacing: 1.1,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildPlayerHeader(
-                    name: localIsPlayer1 ? widget.localName : widget.remoteName,
-                    player: Player.player1,
-                    isLocal: localIsPlayer1,
-                    avatar: localIsPlayer1
-                        ? widget.localAvatarBase64
-                        : widget.remoteAvatarBase64,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildPlayerHeader(
-                    name: localIsPlayer1 ? widget.remoteName : widget.localName,
-                    player: Player.player2,
-                    isLocal: !localIsPlayer1,
-                    avatar: localIsPlayer1
-                        ? widget.remoteAvatarBase64
-                        : widget.localAvatarBase64,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 12,
+                    const SizedBox(width: 48),
+                  ],
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(70),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _statusColor.withAlpha(170)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildPlayerHeader(
+                      name: localIsPlayer1
+                          ? widget.localName
+                          : widget.remoteName,
+                      player: Player.player1,
+                      isLocal: localIsPlayer1,
+                      avatar: localIsPlayer1
+                          ? widget.localAvatarBase64
+                          : widget.remoteAvatarBase64,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPlayerHeader(
+                      name: localIsPlayer1
+                          ? widget.remoteName
+                          : widget.localName,
+                      player: Player.player2,
+                      isLocal: !localIsPlayer1,
+                      avatar: localIsPlayer1
+                          ? widget.remoteAvatarBase64
+                          : widget.localAvatarBase64,
+                    ),
+                  ],
                 ),
-                child: Text(
-                  _statusText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _statusColor,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(70),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _statusColor.withAlpha(170)),
+                  ),
+                  child: Text(
+                    _statusText,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: GameBoard(
-                  gameState: _gameState,
-                  interactivePlayer: widget.localPlayer,
-                  onStateChanged: _handleLocalStateChanged,
+                const SizedBox(height: 10),
+                Expanded(
+                  child: AbsorbPointer(
+                    absorbing: _peerDisconnected,
+                    child: GameBoard(
+                      gameState: _gameState,
+                      interactivePlayer: widget.localPlayer,
+                      onStateChanged: _handleLocalStateChanged,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

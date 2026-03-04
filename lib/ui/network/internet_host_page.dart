@@ -174,6 +174,9 @@ class _InternetHostPageState extends State<InternetHostPage> {
       final guestName = (message['name'] as String?)?.trim();
       final guestAvatar = message['avatar'] as String?;
 
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _guestConnected = true;
         _guestName = guestName == null || guestName.isEmpty
@@ -193,6 +196,9 @@ class _InternetHostPageState extends State<InternetHostPage> {
     }
 
     if (type == 'leave') {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _guestConnected = false;
         _guestName = 'Invite';
@@ -298,6 +304,9 @@ class _InternetHostPageState extends State<InternetHostPage> {
   @override
   Widget build(BuildContext context) {
     final isSmallScreen = MediaQuery.of(context).size.height < 700;
+    final guestStartLabel = _guestName.trim().isEmpty
+        ? 'Ami'
+        : _guestName.trim();
 
     return Scaffold(
       backgroundColor: GameConstants.backgroundColor,
@@ -438,9 +447,15 @@ class _InternetHostPageState extends State<InternetHostPage> {
                       width: 1.2,
                     ),
                   ),
-                  segments: const [
-                    ButtonSegment<bool>(value: true, label: Text('Host')),
-                    ButtonSegment<bool>(value: false, label: Text('Join')),
+                  segments: [
+                    const ButtonSegment<bool>(value: true, label: Text('Moi')),
+                    ButtonSegment<bool>(
+                      value: false,
+                      label: Text(
+                        guestStartLabel,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                   selected: {_hostStarts},
                   onSelectionChanged: (selection) {

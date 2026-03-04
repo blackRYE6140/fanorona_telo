@@ -30,7 +30,7 @@ class _LanHostPageState extends State<LanHostPage> {
   StreamSubscription<Map<String, dynamic>>? _peerSubscription;
 
   final String _sessionCode = LanUtils.generateSessionCode();
-  String _statusText = 'Initialisation du serveur...';
+  String _statusText = 'Préparation de la partie...';
   String? _localIp;
   int? _port;
 
@@ -101,7 +101,7 @@ class _LanHostPageState extends State<LanHostPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _statusText = 'Échec de création du serveur socket.';
+        _statusText = 'Impossible de démarrer la connexion locale.';
       });
     }
   }
@@ -134,6 +134,9 @@ class _LanHostPageState extends State<LanHostPage> {
           final guestName = (message['name'] as String?)?.trim();
           final guestAvatar = message['avatar'] as String?;
 
+          if (!mounted) {
+            return;
+          }
           setState(() {
             _guestConnected = true;
             _guestName = guestName == null || guestName.isEmpty
@@ -152,6 +155,9 @@ class _LanHostPageState extends State<LanHostPage> {
         }
 
         if (type == 'leave') {
+          if (!mounted) {
+            return;
+          }
           setState(() {
             _guestConnected = false;
             _guestName = 'Invité';
@@ -239,6 +245,9 @@ class _LanHostPageState extends State<LanHostPage> {
     final qrSize = (screenWidth - (isSmallScreen ? 56 : 72))
         .clamp(160.0, 220.0)
         .toDouble();
+    final guestStartLabel = _guestName.trim().isEmpty
+        ? 'Ami'
+        : _guestName.trim();
 
     return Scaffold(
       backgroundColor: GameConstants.backgroundColor,
@@ -257,7 +266,7 @@ class _LanHostPageState extends State<LanHostPage> {
                     ),
                     const Expanded(
                       child: Text(
-                        'HOST SOCKET',
+                        'CRÉER LA PARTIE',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -369,15 +378,29 @@ class _LanHostPageState extends State<LanHostPage> {
                       foregroundColor: Colors.white,
                       backgroundColor: Colors.black.withAlpha(70),
                       selectedForegroundColor: Colors.black,
-                      selectedBackgroundColor: const Color.fromARGB(255, 128, 2, 80),
+                      selectedBackgroundColor: const Color.fromARGB(
+                        255,
+                        128,
+                        2,
+                        80,
+                      ),
                       side: BorderSide(
                         color: Colors.white.withAlpha(160),
                         width: 1.2,
                       ),
                     ),
-                    segments: const [
-                      ButtonSegment<bool>(value: true, label: Text('Host')),
-                      ButtonSegment<bool>(value: false, label: Text('Join')),
+                    segments: [
+                      const ButtonSegment<bool>(
+                        value: true,
+                        label: Text('Moi'),
+                      ),
+                      ButtonSegment<bool>(
+                        value: false,
+                        label: Text(
+                          guestStartLabel,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                     selected: {_hostStarts},
                     onSelectionChanged: (selection) {

@@ -19,24 +19,37 @@ class LanLobbyPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              IconButton(
-                alignment: Alignment.centerLeft,
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              SizedBox(height: isSmallScreen ? 12 : 24),
-              Text(
-                'RÉSEAU LOCAL',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isSmallScreen ? 26 : 34,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    alignment: Alignment.centerLeft,
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'RÉSEAU LOCAL',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isSmallScreen ? 26 : 34,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.sms_outlined,
+                    color: Colors.white.withAlpha(210),
+                    size: isSmallScreen ? 24 : 28,
+                  ),
+                  const SizedBox(width: 12),
+                ],
               ),
               const SizedBox(height: 10),
               Text(
-                'Host crée la partie, Join la rejoint via QR code.',
+                'Créez une partie puis partagez le QR code.\n'
+                'Astuce: connectez les 2 téléphones au même Wi-Fi, ou activez '
+                'le point d\'accès sur l\'un puis connectez l\'autre.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withAlpha(180),
@@ -46,7 +59,7 @@ class LanLobbyPage extends StatelessWidget {
               SizedBox(height: isSmallScreen ? 28 : 50),
               _actionCard(
                 context,
-                title: 'HOST',
+                title: 'CRÉER',
                 subtitle: 'Créer une partie et afficher le QR code',
                 icon: Icons.hub,
                 color: GameConstants.neonBlue,
@@ -60,8 +73,8 @@ class LanLobbyPage extends StatelessWidget {
               SizedBox(height: isSmallScreen ? 16 : 22),
               _actionCard(
                 context,
-                title: 'JOIN',
-                subtitle: 'Scanner le QR code du host',
+                title: 'REJOINDRE',
+                subtitle: 'Scanner le QR code du créateur',
                 icon: Icons.qr_code_scanner,
                 color: GameConstants.neonPink,
                 onTap: () {

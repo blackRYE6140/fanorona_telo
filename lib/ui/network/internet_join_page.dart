@@ -242,6 +242,9 @@ class _InternetJoinPageState extends State<InternetJoinPage> {
       }
 
       if (stateMap == null) {
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _statusText = 'Données de partie invalides.';
           _joiningHost = false;
