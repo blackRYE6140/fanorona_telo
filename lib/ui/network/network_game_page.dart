@@ -40,6 +40,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   GameStatus? _shownGameResult;
   bool _isLeavingGame = false;
   bool _disconnectDialogShown = false;
+  String? _incomingChatText;
+  Timer? _incomingChatTimer;
 
   @override
   void initState() {
@@ -59,6 +61,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   @override
   void dispose() {
     _isLeavingGame = true;
+    _incomingChatTimer?.cancel();
+    _incomingChatTimer = null;
     _peerSubscription?.cancel();
     widget.peer.dispose();
     super.dispose();
@@ -96,6 +100,15 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       return;
     }
 
+    if (type == 'chat') {
+      final rawText = message['text'];
+      final chatText = rawText is String ? rawText.trim() : '';
+      if (chatText.isNotEmpty) {
+        _showIncomingChat('${widget.remoteName}: $chatText');
+      }
+      return;
+    }
+
     if (type == 'error') {
       if (!mounted) return;
       final messageText = (message['message'] as String?) ?? 'Erreur réseau';
@@ -103,6 +116,110 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
         context,
       ).showSnackBar(SnackBar(content: Text(messageText)));
     }
+  }
+
+  void _showIncomingChat(String text) {
+    if (!mounted) {
+      return;
+    }
+
+    _incomingChatTimer?.cancel();
+    setState(() {
+      _incomingChatText = text;
+    });
+
+    _incomingChatTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _incomingChatText = null;
+      });
+    });
+  }
+
+  Future<void> _openMessageComposer() async {
+    if (_peerDisconnected) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Connexion interrompue.')));
+      return;
+    }
+
+    const quickMessages = <String>[
+      'Bien joué !',
+      'Bonne chance !',
+      'À toi de jouer.',
+      'Attends un peu.',
+      'Merci !',
+    ];
+
+    final message =
+        await showModalBottomSheet<String>(
+          context: context,
+          backgroundColor: GameConstants.backgroundColor,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (sheetContext) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Message rapide',
+                    style: TextStyle(
+                      color: GameConstants.gridColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...quickMessages.map((text) {
+                    return ListTile(
+                      leading: Icon(
+                        Icons.sms_outlined,
+                        color: GameConstants.neonBlue,
+                      ),
+                      title: Text(
+                        text,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      onTap: () => Navigator.of(sheetContext).pop(text),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        ) ??
+        '';
+
+    if (!mounted) {
+      return;
+    }
+
+    final text = message.trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    widget.peer.send({'type': 'chat', 'text': text});
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Message envoyé')));
   }
 
   void _handlePeerDisconnected(String reason) {
@@ -503,19 +620,21 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(10),
-            child: Column(
+            child: Stack(
               children: [
-                Row(
+                Column(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: _handleExitPressed,
-                    ),
-                    const Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                          onPressed: _handleExitPressed,
+                        ),
+                        const Expanded(
+                          child: Text(
                             'PARTIE RÉSEAU',
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -525,76 +644,109 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                               letterSpacing: 1.1,
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Icon(
-                            Icons.sms_outlined,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                        ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.sms_outlined),
+                          color: Colors.white70,
+                          onPressed: _openMessageComposer,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildPlayerHeader(
+                          name: localIsPlayer1
+                              ? widget.localName
+                              : widget.remoteName,
+                          player: Player.player1,
+                          isLocal: localIsPlayer1,
+                          avatar: localIsPlayer1
+                              ? widget.localAvatarBase64
+                              : widget.remoteAvatarBase64,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildPlayerHeader(
+                          name: localIsPlayer1
+                              ? widget.remoteName
+                              : widget.localName,
+                          player: Player.player2,
+                          isLocal: !localIsPlayer1,
+                          avatar: localIsPlayer1
+                              ? widget.remoteAvatarBase64
+                              : widget.localAvatarBase64,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(70),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _statusColor.withAlpha(170)),
+                      ),
+                      child: Text(
+                        _statusText,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _statusColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _buildPlayerHeader(
-                      name: localIsPlayer1
-                          ? widget.localName
-                          : widget.remoteName,
-                      player: Player.player1,
-                      isLocal: localIsPlayer1,
-                      avatar: localIsPlayer1
-                          ? widget.localAvatarBase64
-                          : widget.remoteAvatarBase64,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildPlayerHeader(
-                      name: localIsPlayer1
-                          ? widget.remoteName
-                          : widget.localName,
-                      player: Player.player2,
-                      isLocal: !localIsPlayer1,
-                      avatar: localIsPlayer1
-                          ? widget.remoteAvatarBase64
-                          : widget.localAvatarBase64,
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: AbsorbPointer(
+                        absorbing: _peerDisconnected,
+                        child: GameBoard(
+                          gameState: _gameState,
+                          interactivePlayer: widget.localPlayer,
+                          onStateChanged: _handleLocalStateChanged,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(70),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _statusColor.withAlpha(170)),
-                  ),
-                  child: Text(
-                    _statusText,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _statusColor,
-                      fontWeight: FontWeight.bold,
+                if (_incomingChatText != null)
+                  Positioned(
+                    top: 56,
+                    left: 6,
+                    right: 6,
+                    child: IgnorePointer(
+                      child: AnimatedOpacity(
+                        opacity: 1,
+                        duration: const Duration(milliseconds: 180),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(190),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: GameConstants.neonBlue.withAlpha(180),
+                            ),
+                          ),
+                          child: Text(
+                            _incomingChatText!,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: AbsorbPointer(
-                    absorbing: _peerDisconnected,
-                    child: GameBoard(
-                      gameState: _gameState,
-                      interactivePlayer: widget.localPlayer,
-                      onStateChanged: _handleLocalStateChanged,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
