@@ -12,7 +12,10 @@ Jeu **Fanorona Telo** (grille 3x3) en Flutter, avec modes local, réseau (LAN + 
   - saisie d'un message court personnalisé.
 - Vocal en temps réel en partie réseau:
   - icône micro `off` / `on` à côté de l'icône SMS,
-  - transmission audio en direct vers l'adversaire quand activé.
+  - icône parleur `off` / `on` indépendante du micro,
+  - transmission audio en direct vers l'adversaire quand le micro est activé.
+- Déconnexion internet robuste:
+  - si un joueur quitte la partie, l'autre reçoit un message de déconnexion et peut revenir au menu sans blocage de l'UI.
 - Mode `Contre IA` avec 2 difficultés:
   - `Stratège` (plus intelligent qu'avant, mais volontairement battable).
   - `Maître` (analyse plus profonde et plus agressive).
@@ -122,13 +125,17 @@ Flux in-app:
 - `Rejoindre amis`: affiche la liste des invitations (nom + ID), puis connexion en un clic.
 - En partie:
   - bouton `SMS`: ouvre les messages rapides + message court personnalisé.
-  - bouton `Micro`: active/désactive le vocal temps réel.
+  - bouton `Micro`: active/désactive l'envoi de votre voix.
+  - bouton `Parleur`: active/désactive la voix reçue de l'adversaire.
 
 ### Vocal temps réel (LAN + internet)
 
 - Le vocal fonctionne dans `PARTIE RÉSEAU` (LAN et internet).
-- Les 2 joueurs doivent activer leur micro pour parler/écouter.
+- `Micro` et `Parleur` sont indépendants sur chaque téléphone.
+- Exemple: si votre `Micro` est OFF mais `Parleur` ON, vous entendez l'adversaire sans parler.
+- Exemple: si votre `Micro` est ON mais `Parleur` OFF, vous parlez sans écouter l'adversaire.
 - Le flux audio est envoyé en paquets réseau (`audio_chunk`) en PCM16 mono 16 kHz.
+- Anti-bruit/anti-larsen actif: filtrage du bruit + suppression duplex pour limiter les boucles de feedback quand les deux côtés activent micro + parleur.
 - Si la permission micro est refusée, l'activation vocale échoue avec message utilisateur.
 
 ## 4) Architecture rapide

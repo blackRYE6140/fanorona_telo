@@ -40,8 +40,10 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   StreamSubscription<Map<String, dynamic>>? _peerSubscription;
   final VoiceChatService _voiceChatService = VoiceChatService();
   bool _peerDisconnected = false;
-  bool _audioEnabled = false;
-  bool _audioToggleInProgress = false;
+  bool _micEnabled = false;
+  bool _speakerEnabled = false;
+  bool _micToggleInProgress = false;
+  bool _speakerToggleInProgress = false;
   GameStatus? _shownGameResult;
   bool _isLeavingGame = false;
   bool _disconnectDialogShown = false;
@@ -61,6 +63,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
         );
       },
     );
+
+    unawaited(_setSpeakerEnabled(true, showFeedback: false));
   }
 
   @override
@@ -116,7 +120,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     }
 
     if (type == 'audio_chunk') {
-      if (!_audioEnabled) {
+      if (!_speakerEnabled) {
         return;
       }
 
@@ -140,8 +144,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       final enabled = message['enabled'] == true;
       _showIncomingChat(
         enabled
-            ? '${widget.remoteName} a activé le vocal.'
-            : '${widget.remoteName} a coupé le vocal.',
+            ? '${widget.remoteName} a activé son micro.'
+            : '${widget.remoteName} a coupé son micro.',
       );
       return;
     }
@@ -175,41 +179,58 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     });
   }
 
-  Future<void> _toggleAudio() async {
-    if (_peerDisconnected || _audioToggleInProgress) {
+  Future<void> _toggleMicro() async {
+    if (_peerDisconnected || _micToggleInProgress) {
       return;
     }
 
-    _audioToggleInProgress = true;
+    _micToggleInProgress = true;
     try {
-      if (_audioEnabled) {
-        await _setAudioEnabled(false);
+      if (_micEnabled) {
+        await _setMicroEnabled(false);
       } else {
-        await _setAudioEnabled(true);
+        await _setMicroEnabled(true);
       }
     } finally {
-      _audioToggleInProgress = false;
+      _micToggleInProgress = false;
     }
   }
 
-  Future<void> _setAudioEnabled(
+  Future<void> _toggleSpeaker() async {
+    if (_peerDisconnected || _speakerToggleInProgress) {
+      return;
+    }
+
+    _speakerToggleInProgress = true;
+    try {
+      if (_speakerEnabled) {
+        await _setSpeakerEnabled(false);
+      } else {
+        await _setSpeakerEnabled(true);
+      }
+    } finally {
+      _speakerToggleInProgress = false;
+    }
+  }
+
+  Future<void> _setMicroEnabled(
     bool enabled, {
     bool notifyPeer = true,
     bool showFeedback = true,
   }) async {
-    if (enabled == _audioEnabled) {
+    if (enabled == _micEnabled) {
       return;
     }
 
     if (enabled) {
-      final started = await _voiceChatService.start(
-        onLocalAudioChunk: _sendAudioChunk,
-        onCaptureError: _handleAudioCaptureError,
+      final started = await _voiceChatService.startCapture(
+        onLocalAudioChunk: _sendMicAudioChunk,
+        onCaptureError: _handleMicCaptureError,
       );
 
       if (!mounted) {
         if (started) {
-          await _voiceChatService.stop();
+          await _voiceChatService.stopCapture();
         }
         return;
       }
@@ -228,7 +249,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       }
 
       setState(() {
-        _audioEnabled = true;
+        _micEnabled = true;
       });
 
       if (notifyPeer && !_peerDisconnected) {
@@ -238,18 +259,18 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       if (showFeedback) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Vocal activé')));
+        ).showSnackBar(const SnackBar(content: Text('Micro activé')));
       }
       return;
     }
 
-    await _voiceChatService.stop();
+    await _voiceChatService.stopCapture();
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _audioEnabled = false;
+      _micEnabled = false;
     });
 
     if (notifyPeer && !_peerDisconnected) {
@@ -259,12 +280,45 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     if (showFeedback) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Vocal désactivé')));
+      ).showSnackBar(const SnackBar(content: Text('Micro désactivé')));
     }
   }
 
-  void _sendAudioChunk(Uint8List chunk) {
-    if (_peerDisconnected || !_audioEnabled || chunk.isEmpty) {
+  Future<void> _setSpeakerEnabled(
+    bool enabled, {
+    bool showFeedback = true,
+  }) async {
+    if (enabled == _speakerEnabled) {
+      return;
+    }
+
+    final success = await _voiceChatService.setPlaybackEnabled(enabled);
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'activer le parleur.')),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _speakerEnabled = enabled;
+    });
+
+    if (showFeedback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(enabled ? 'Parleur activé' : 'Parleur coupé')),
+      );
+    }
+  }
+
+  void _sendMicAudioChunk(Uint8List chunk) {
+    if (_peerDisconnected || !_micEnabled || chunk.isEmpty) {
       return;
     }
 
@@ -276,18 +330,18 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     });
   }
 
-  void _handleAudioCaptureError(Object error, StackTrace stackTrace) {
-    if (!_audioEnabled) {
+  void _handleMicCaptureError(Object error, StackTrace stackTrace) {
+    if (!_micEnabled) {
       return;
     }
 
-    unawaited(_setAudioEnabled(false, notifyPeer: true, showFeedback: false));
+    unawaited(_setMicroEnabled(false, notifyPeer: true, showFeedback: false));
 
     if (!mounted) {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Le flux vocal a été interrompu.')),
+      const SnackBar(content: Text('Le flux micro a été interrompu.')),
     );
   }
 
@@ -332,9 +386,9 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       return;
     }
 
-    if (_audioEnabled) {
+    if (_micEnabled) {
       unawaited(
-        _setAudioEnabled(false, notifyPeer: false, showFeedback: false),
+        _setMicroEnabled(false, notifyPeer: false, showFeedback: false),
       );
     }
 
@@ -448,8 +502,8 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       return false;
     }
 
-    if (_audioEnabled) {
-      await _setAudioEnabled(false, notifyPeer: false, showFeedback: false);
+    if (_micEnabled) {
+      await _setMicroEnabled(false, notifyPeer: false, showFeedback: false);
     }
 
     _isLeavingGame = true;
@@ -764,16 +818,30 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: _audioEnabled
-                                  ? 'Vocal activé'
-                                  : 'Vocal désactivé',
+                              tooltip: _speakerEnabled
+                                  ? 'Parleur activé'
+                                  : 'Parleur coupé',
                               icon: Icon(
-                                _audioEnabled ? Icons.mic : Icons.mic_off,
+                                _speakerEnabled
+                                    ? Icons.volume_up
+                                    : Icons.volume_off,
                               ),
-                              color: _audioEnabled
+                              color: _speakerEnabled
                                   ? Colors.greenAccent
                                   : Colors.white70,
-                              onPressed: _toggleAudio,
+                              onPressed: _toggleSpeaker,
+                            ),
+                            IconButton(
+                              tooltip: _micEnabled
+                                  ? 'Micro activé'
+                                  : 'Micro coupé',
+                              icon: Icon(
+                                _micEnabled ? Icons.mic : Icons.mic_off,
+                              ),
+                              color: _micEnabled
+                                  ? Colors.greenAccent
+                                  : Colors.white70,
+                              onPressed: _toggleMicro,
                             ),
                             IconButton(
                               icon: const Icon(Icons.sms_outlined),
