@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -7,6 +8,7 @@ import '../../game/constants.dart';
 import '../../game/game_state.dart';
 import '../../network/game_peer.dart';
 import '../../network/network_codec.dart';
+import '../../network/voice_chat_service.dart';
 import '../game_board.dart';
 
 class NetworkGamePage extends StatefulWidget {
@@ -36,7 +38,10 @@ class NetworkGamePage extends StatefulWidget {
 class _NetworkGamePageState extends State<NetworkGamePage> {
   late GameState _gameState;
   StreamSubscription<Map<String, dynamic>>? _peerSubscription;
+  final VoiceChatService _voiceChatService = VoiceChatService();
   bool _peerDisconnected = false;
+  bool _audioEnabled = false;
+  bool _audioToggleInProgress = false;
   GameStatus? _shownGameResult;
   bool _isLeavingGame = false;
   bool _disconnectDialogShown = false;
@@ -64,6 +69,7 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     _incomingChatTimer?.cancel();
     _incomingChatTimer = null;
     _peerSubscription?.cancel();
+    unawaited(_voiceChatService.dispose());
     widget.peer.dispose();
     super.dispose();
   }
@@ -109,6 +115,37 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       return;
     }
 
+    if (type == 'audio_chunk') {
+      if (!_audioEnabled) {
+        return;
+      }
+
+      final rawData = message['data'];
+      if (rawData is! String || rawData.isEmpty) {
+        return;
+      }
+
+      try {
+        final bytes = base64Decode(rawData);
+        if (bytes.isNotEmpty) {
+          _voiceChatService.handleRemoteAudioChunk(bytes);
+        }
+      } catch (_) {
+        // Ignore malformed audio packets.
+      }
+      return;
+    }
+
+    if (type == 'audio_state') {
+      final enabled = message['enabled'] == true;
+      _showIncomingChat(
+        enabled
+            ? '${widget.remoteName} a activé le vocal.'
+            : '${widget.remoteName} a coupé le vocal.',
+      );
+      return;
+    }
+
     if (type == 'error') {
       if (!mounted) return;
       final messageText = (message['message'] as String?) ?? 'Erreur réseau';
@@ -138,6 +175,122 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
     });
   }
 
+  Future<void> _toggleAudio() async {
+    if (_peerDisconnected || _audioToggleInProgress) {
+      return;
+    }
+
+    _audioToggleInProgress = true;
+    try {
+      if (_audioEnabled) {
+        await _setAudioEnabled(false);
+      } else {
+        await _setAudioEnabled(true);
+      }
+    } finally {
+      _audioToggleInProgress = false;
+    }
+  }
+
+  Future<void> _setAudioEnabled(
+    bool enabled, {
+    bool notifyPeer = true,
+    bool showFeedback = true,
+  }) async {
+    if (enabled == _audioEnabled) {
+      return;
+    }
+
+    if (enabled) {
+      final started = await _voiceChatService.start(
+        onLocalAudioChunk: _sendAudioChunk,
+        onCaptureError: _handleAudioCaptureError,
+      );
+
+      if (!mounted) {
+        if (started) {
+          await _voiceChatService.stop();
+        }
+        return;
+      }
+
+      if (!started) {
+        if (showFeedback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Impossible d\'activer le micro. Vérifiez la permission.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _audioEnabled = true;
+      });
+
+      if (notifyPeer && !_peerDisconnected) {
+        widget.peer.send({'type': 'audio_state', 'enabled': true});
+      }
+
+      if (showFeedback) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Vocal activé')));
+      }
+      return;
+    }
+
+    await _voiceChatService.stop();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _audioEnabled = false;
+    });
+
+    if (notifyPeer && !_peerDisconnected) {
+      widget.peer.send({'type': 'audio_state', 'enabled': false});
+    }
+
+    if (showFeedback) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vocal désactivé')));
+    }
+  }
+
+  void _sendAudioChunk(Uint8List chunk) {
+    if (_peerDisconnected || !_audioEnabled || chunk.isEmpty) {
+      return;
+    }
+
+    widget.peer.send({
+      'type': 'audio_chunk',
+      'data': base64Encode(chunk),
+      'sampleRate': VoiceChatService.sampleRate,
+      'channels': VoiceChatService.channels,
+    });
+  }
+
+  void _handleAudioCaptureError(Object error, StackTrace stackTrace) {
+    if (!_audioEnabled) {
+      return;
+    }
+
+    unawaited(_setAudioEnabled(false, notifyPeer: true, showFeedback: false));
+
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Le flux vocal a été interrompu.')),
+    );
+  }
+
   Future<void> _openMessageComposer() async {
     if (_peerDisconnected) {
       ScaffoldMessenger.of(
@@ -146,63 +299,15 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
       return;
     }
 
-    const quickMessages = <String>[
-      'Bien joué !',
-      'Bonne chance !',
-      'À toi de jouer.',
-      'Attends un peu.',
-      'Merci !',
-    ];
-
     final message =
         await showModalBottomSheet<String>(
           context: context,
+          isScrollControlled: true,
           backgroundColor: GameConstants.backgroundColor,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          builder: (sheetContext) {
-            return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Message rapide',
-                    style: TextStyle(
-                      color: GameConstants.gridColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ...quickMessages.map((text) {
-                    return ListTile(
-                      leading: Icon(
-                        Icons.sms_outlined,
-                        color: GameConstants.neonBlue,
-                      ),
-                      title: Text(
-                        text,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      onTap: () => Navigator.of(sheetContext).pop(text),
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            );
-          },
+          builder: (_) => const _MessageComposerSheet(),
         ) ??
         '';
 
@@ -225,6 +330,12 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
   void _handlePeerDisconnected(String reason) {
     if (!mounted || _isLeavingGame || _peerDisconnected) {
       return;
+    }
+
+    if (_audioEnabled) {
+      unawaited(
+        _setAudioEnabled(false, notifyPeer: false, showFeedback: false),
+      );
     }
 
     setState(() {
@@ -335,6 +446,10 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
 
     if (!shouldExit) {
       return false;
+    }
+
+    if (_audioEnabled) {
+      await _setAudioEnabled(false, notifyPeer: false, showFeedback: false);
     }
 
     _isLeavingGame = true;
@@ -645,10 +760,27 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.sms_outlined),
-                          color: Colors.white70,
-                          onPressed: _openMessageComposer,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: _audioEnabled
+                                  ? 'Vocal activé'
+                                  : 'Vocal désactivé',
+                              icon: Icon(
+                                _audioEnabled ? Icons.mic : Icons.mic_off,
+                              ),
+                              color: _audioEnabled
+                                  ? Colors.greenAccent
+                                  : Colors.white70,
+                              onPressed: _toggleAudio,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.sms_outlined),
+                              color: Colors.white70,
+                              onPressed: _openMessageComposer,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -750,6 +882,143 @@ class _NetworkGamePageState extends State<NetworkGamePage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MessageComposerSheet extends StatefulWidget {
+  const _MessageComposerSheet();
+
+  @override
+  State<_MessageComposerSheet> createState() => _MessageComposerSheetState();
+}
+
+class _MessageComposerSheetState extends State<_MessageComposerSheet> {
+  static const int _maxCustomMessageLength = 60;
+  static const List<String> _quickMessages = <String>[
+    'Bien joué !',
+    'Bonne chance !',
+    'À toi de jouer.',
+    'Attends un peu.',
+    'Merci !',
+  ];
+
+  late final TextEditingController _customMessageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _customMessageController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _customMessageController.dispose();
+    super.dispose();
+  }
+
+  void _sendCustomMessage() {
+    final text = _customMessageController.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    Navigator.of(context).pop(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final customText = _customMessageController.text.trim();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Message rapide',
+              style: TextStyle(
+                color: GameConstants.gridColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+              child: TextField(
+                controller: _customMessageController,
+                maxLength: _maxCustomMessageLength,
+                textInputAction: TextInputAction.send,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Écrire un message court...',
+                  hintStyle: const TextStyle(color: Colors.white54),
+                  counterStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.black.withAlpha(120),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: GameConstants.gridColor.withAlpha(120),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: GameConstants.neonBlue,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _sendCustomMessage(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: customText.isEmpty ? null : _sendCustomMessage,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: GameConstants.neonBlue,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text('Envoyer'),
+                ),
+              ),
+            ),
+            const Divider(color: Colors.white24, height: 1),
+            ..._quickMessages.map((text) {
+              return ListTile(
+                leading: Icon(
+                  Icons.sms_outlined,
+                  color: GameConstants.neonBlue,
+                ),
+                title: Text(text, style: const TextStyle(color: Colors.white)),
+                onTap: () => Navigator.of(context).pop(text),
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );

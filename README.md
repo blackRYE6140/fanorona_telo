@@ -1,12 +1,18 @@
 # Fanorona Telo (Flutter)
 
-Jeu **Fanorona Telo** (grille 3x3) en Flutter, avec mode 2 joueurs local et mode contre IA.
+Jeu **Fanorona Telo** (grille 3x3) en Flutter, avec modes local, réseau (LAN + internet) et IA.
 
 ## 1) Fonctionnalités
 
 - Mode `2 Joueurs`.
 - Mode `2 Joueurs` en `socket réseau local` (host/join via QR code).
 - Mode `2 Joueurs` en `connexion internet` (Inviter amis / Rejoindre amis avec liste en direct nom + ID).
+- Messagerie rapide en partie réseau:
+  - messages prédéfinis,
+  - saisie d'un message court personnalisé.
+- Vocal en temps réel en partie réseau:
+  - icône micro `off` / `on` à côté de l'icône SMS,
+  - transmission audio en direct vers l'adversaire quand activé.
 - Mode `Contre IA` avec 2 difficultés:
   - `Stratège` (plus intelligent qu'avant, mais volontairement battable).
   - `Maître` (analyse plus profonde et plus agressive).
@@ -38,6 +44,8 @@ Le jeu se joue sur une grille 3x3 avec 3 pièces par joueur.
 
 - Flutter SDK installé.
 - Un device/emulator Android/iOS/Web/Desktop selon votre cible.
+- Pour Android: `minSdk = 23` (requis par l'enregistrement audio).
+- Pour le mode vocal: permissions microphone côté OS.
 
 ### Commandes
 
@@ -112,6 +120,16 @@ Notes:
 Flux in-app:
 - `Inviter amis`: publie automatiquement le nom et l'ID de connexion.
 - `Rejoindre amis`: affiche la liste des invitations (nom + ID), puis connexion en un clic.
+- En partie:
+  - bouton `SMS`: ouvre les messages rapides + message court personnalisé.
+  - bouton `Micro`: active/désactive le vocal temps réel.
+
+### Vocal temps réel (LAN + internet)
+
+- Le vocal fonctionne dans `PARTIE RÉSEAU` (LAN et internet).
+- Les 2 joueurs doivent activer leur micro pour parler/écouter.
+- Le flux audio est envoyé en paquets réseau (`audio_chunk`) en PCM16 mono 16 kHz.
+- Si la permission micro est refusée, l'activation vocale échoue avec message utilisateur.
 
 ## 4) Architecture rapide
 
@@ -127,11 +145,17 @@ lib/
     game_logic.dart         # Règles métier (placements, mouvements, victoire)
     game_state.dart         # État du jeu
     constants.dart          # Constantes globales
+  network/
+    game_peer.dart          # Contrat de transport réseau
+    lan_peer.dart           # Transport socket LAN
+    relay_peer.dart         # Transport WebSocket internet
+    voice_chat_service.dart # Capture micro + lecture + envoi audio temps réel
   ui/
     home_page.dart
     ai_selection_page.dart  # Choix difficulté + popup "qui commence"
     game_page.dart          # Ecran de jeu + popup fin de partie
     game_board.dart         # Plateau et interactions
+    network/                # Flux réseau (host/join/lobby/partie réseau)
   utils/
     position_utils.dart     # Adjacence et conversion coordonnées
 ```
